@@ -1,23 +1,27 @@
 package main
 
 import (
-	"net/http"
+	"fmt"
+
+	"stridewars/backend/internal/config"
+	"stridewars/backend/internal/routes"
+	"stridewars/backend/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Create a new Gin router
+
+	cfg := config.Load()
+
+	database.Connect(cfg)
+
 	router := gin.Default()
 
-	// Health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
-			"message": "StrideWars API is running",
-		})
-	})
+	routes.Register(router)
 
-	// Start the server
-	router.Run(":8080")
+	fmt.Println("Server running on port", cfg.Port)
+
+	router.Run(":" + cfg.Port)
+
 }
