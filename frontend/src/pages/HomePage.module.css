@@ -1,0 +1,211 @@
+/* HomePage CSS Module */
+
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--gradient-hero);
+}
+
+/* ── Ambient glow effects ─────────────────────────────────────────────────── */
+.glowOrb {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(108, 99, 255, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+  animation: pulseGlow 6s ease-in-out infinite;
+}
+
+.glowOrbSecondary {
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(255, 101, 132, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  animation: pulseGlow 8s ease-in-out infinite reverse;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+
+/* ── Grid overlay ─────────────────────────────────────────────────────────── */
+.gridOverlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(108, 99, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(108, 99, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* ── Main content ─────────────────────────────────────────────────────────── */
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2xl);
+  padding: var(--space-3xl) var(--space-xl);
+  max-width: 800px;
+  width: 100%;
+}
+
+/* ── Phase badge ──────────────────────────────────────────────────────────── */
+.phaseBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 16px;
+  background: rgba(108, 99, 255, 0.12);
+  border: var(--border-emphasis);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a09aff;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.phaseDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-brand-primary);
+  animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Logo lockup ──────────────────────────────────────────────────────────── */
+.logoLockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.logoIcon {
+  width: 80px;
+  height: 80px;
+  filter: drop-shadow(0 0 24px rgba(108, 99, 255, 0.5));
+  animation: floatLogo 4s ease-in-out infinite;
+}
+
+@keyframes floatLogo {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+/* ── Tagline ──────────────────────────────────────────────────────────────── */
+.tagline {
+  font-size: clamp(1rem, 2.5vw, 1.3rem);
+  color: var(--color-text-secondary);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.taglineAccent {
+  color: var(--color-brand-accent);
+  font-weight: 600;
+}
+
+/* ── Status grid ──────────────────────────────────────────────────────────── */
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 560px;
+}
+
+@media (min-width: 640px) {
+  .statusGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statusCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-lg) var(--space-md);
+  background: var(--color-bg-card);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.statusCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(108, 99, 255, 0.2);
+  box-shadow: var(--shadow-card);
+}
+
+.statusCard--green {
+  border-color: rgba(67, 233, 123, 0.2);
+}
+
+.statusCard--green:hover {
+  border-color: rgba(67, 233, 123, 0.4);
+}
+
+.statusCard--amber {
+  border-color: rgba(255, 183, 77, 0.15);
+}
+
+.statusIcon {
+  font-size: 1.4rem;
+}
+
+.statusLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.statusValue {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* ── Phase description ────────────────────────────────────────────────────── */
+.phaseDesc {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  max-width: 480px;
+}
