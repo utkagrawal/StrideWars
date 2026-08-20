@@ -1,0 +1,106 @@
+services:
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: stridewars_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stridewars}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-stridewars_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stridewars} -d ${POSTGRES_DB:-stridewars_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: stridewars_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── Backend API (Development) ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      target: builder
+    container_name: stridewars_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      DATABASE_URL: postgresql://stridewars:changeme@postgres:5432/stridewars
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: npm run dev
+
+  # ── Background Worker (Development) ────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      target: builder
+    container_name: stridewars_worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_HOST: postgres
+      DATABASE_URL: postgresql://stridewars:changeme@postgres:5432/stridewars
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run worker:dev
+
+  # ── Frontend (Development) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    container_name: stridewars_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+
+# ── Named volumes ─────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local

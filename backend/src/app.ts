@@ -1,17 +1,20 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
+import { healthRouter } from './routes/health';
 
-// Module routers (placeholders — implemented in subsequent phases)
-import { authRouter } from './modules/auth/routes';
-import { usersRouter } from './modules/users/routes';
-import { runsRouter } from './modules/runs/routes';
+// Module routers
+import authRouter from './modules/auth/auth.routes';
+import usersRouter from './modules/users/users.routes';
+import runsRouter from './modules/runs/runs.routes';
 import { territoriesRouter } from './modules/territories/routes';
 import { leaderboardsRouter } from './modules/leaderboards/routes';
 import { socialRouter } from './modules/social/routes';
 import { notificationsRouter } from './modules/notifications/routes';
+import { env } from './config/env';
 
 export function createApp(): Application {
   const app = express();
@@ -20,18 +23,17 @@ export function createApp(): Application {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+      origin: env.CORS_ORIGIN.split(','),
       credentials: true,
     })
   );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
   app.use(requestLogger);
 
-  // ── Health check ───────────────────────────────────────────────────────────
-  app.get('/api/health', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok' });
-  });
+  // ── Health check (Phase 1.5+: probes Postgres + Redis) ────────────────────
+  app.use('/api/health', healthRouter);
 
   // ── Domain module routes ───────────────────────────────────────────────────
   app.use('/api/auth', authRouter);

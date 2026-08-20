@@ -11,4 +11,6 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.test.ts', '!src/server.ts'],
   coverageDirectory: 'coverage',
   clearMocks: true,
+  globalSetup: '<rootDir>/src/jest.globalSetup.ts',
+  setupFilesAfterEnv: ['<rootDir>/src/jest.setup.ts'],
 };

@@ -1,105 +1,113 @@
-import styles from './HomePage.module.css';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { getRuns, Run } from '../api/runs';
+import { getMyTerritories } from '../api/territories';
+import { getUserGlobalRank } from '../api/leaderboards';
+import { getUnreadCount } from '../api/notifications';
+import { useToast } from '../hooks/useToast';
 
-/**
- * HomePage — Phase 1 landing page.
- * Confirms the React app boots and renders the StrideWars brand.
- * Full landing page content will be implemented in a later phase.
- */
-function HomePage(): JSX.Element {
+export default function HomePage() {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [territoryCount, setTerritoryCount] = useState<number>(0);
+  const [rank, setRank] = useState<number | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [
+          runsData,
+          territoriesData,
+          rankData,
+          notificationsData
+        ] = await Promise.all([
+          getRuns(undefined, 5),
+          getMyTerritories(),
+          getUserGlobalRank(),
+          getUnreadCount()
+        ]);
+
+        setRuns(runsData.runs);
+        setTerritoryCount(territoriesData.length);
+        setRank(rankData.rank);
+        setUnreadNotifications(notificationsData.count);
+      } catch (err: any) {
+        addToast(err.response?.data?.error?.message || 'Failed to load dashboard', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [addToast]);
+
+  if (loading) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading Dashboard...</div>;
+  }
+
   return (
-    <main className={styles.hero} id="home-page">
-      {/* Ambient glow layers */}
-      <div className={styles.glowOrb} aria-hidden="true" />
-      <div className={styles.glowOrbSecondary} aria-hidden="true" />
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <h2 style={{ marginBottom: '2rem' }}>Welcome back, {user?.username}!</h2>
 
-      {/* Grid overlay */}
-      <div className={styles.gridOverlay} aria-hidden="true" />
-
-      <div className={styles.content}>
-        {/* Phase badge */}
-        <div className={styles.phaseBadge}>
-          <span className={styles.phaseDot} aria-hidden="true" />
-          Phase 1 — Repository Bootstrap
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '1.5rem',
+        marginBottom: '3rem'
+      }}>
+        <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Global Rank</h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{rank ? `#${rank}` : 'Unranked'}</div>
+          <Link to="/leaderboards" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View Leaderboards →</Link>
         </div>
 
-        {/* Logo + wordmark */}
-        <div className={styles.logoLockup}>
-          <div className={styles.logoIcon} aria-hidden="true">
-            <svg
-              viewBox="0 0 48 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle cx="24" cy="24" r="22" stroke="url(#grad)" strokeWidth="2" />
-              <path
-                d="M14 30L20 18L26 26L32 14"
-                stroke="url(#grad)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="32" cy="14" r="3" fill="url(#grad)" />
-              <defs>
-                <linearGradient
-                  id="grad"
-                  x1="0"
-                  y1="0"
-                  x2="48"
-                  y2="48"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop stopColor="#6C63FF" />
-                  <stop offset="1" stopColor="#FF6584" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <h1 className={styles.wordmark}>StrideWars</h1>
+        <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Territories Owned</h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{territoryCount}</div>
+          <Link to="/territories" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View Map →</Link>
         </div>
 
-        {/* Tagline */}
-        <p className={styles.tagline}>
-          Capture territories. Crush records.{' '}
-          <span className={styles.taglineAccent}>Dominate the map.</span>
-        </p>
-
-        {/* Status cards */}
-        <div className={styles.statusGrid} role="list" aria-label="System status">
-          <StatusCard icon="✅" label="Backend" value="Running on :3001" color="green" />
-          <StatusCard icon="✅" label="Frontend" value="Running on :5173" color="green" />
-          <StatusCard icon="⏳" label="Database" value="Phase 2" color="amber" />
-          <StatusCard icon="⏳" label="Auth" value="Phase 3" color="amber" />
+        <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Recent Runs</h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{runs.length}</div>
+          <Link to="/runs" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View History →</Link>
         </div>
 
-        {/* Phase description */}
-        <p className={styles.phaseDesc}>
-          The monorepo is scaffolded. Backend modules, ESLint, Prettier, and Jest are wired up.
-          <br />
-          Next up: PostgreSQL schema + migrations.
-        </p>
+        <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Unread Alerts</h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{unreadNotifications}</div>
+          <Link to="/notifications" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View Notifications →</Link>
+        </div>
       </div>
-    </main>
-  );
-}
 
-interface StatusCardProps {
-  icon: string;
-  label: string;
-  value: string;
-  color: 'green' | 'amber' | 'red';
-}
-
-function StatusCard({ icon, label, value, color }: StatusCardProps): JSX.Element {
-  return (
-    <div className={`${styles.statusCard} ${styles[`statusCard--${color}`]}`} role="listitem">
-      <span className={styles.statusIcon} aria-hidden="true">
-        {icon}
-      </span>
-      <span className={styles.statusLabel}>{label}</span>
-      <span className={styles.statusValue}>{value}</span>
+      <div>
+        <h3>Recent Activity</h3>
+        {runs.length === 0 ? (
+          <div style={{ background: 'var(--color-bg-surface)', padding: '2rem', textAlign: 'center', borderRadius: '8px', marginTop: '1rem' }}>
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>You haven't recorded any runs yet.</p>
+            <Link to="/runs/new" style={{ padding: '0.5rem 1rem', background: 'var(--color-brand-primary)', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
+              Record First Run
+            </Link>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+            {runs.map(run => (
+              <div key={run.id} style={{ background: 'var(--color-bg-surface)', padding: '1rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>{(run.distance_meters / 1000).toFixed(2)} km in {Math.floor(run.duration_seconds / 60)}m {run.duration_seconds % 60}s</div>
+                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{new Date(run.started_at).toLocaleDateString()}</div>
+                </div>
+                <Link to={`/runs/${run.id}`} style={{ color: 'var(--color-brand-primary)', textDecoration: 'none' }}>Details</Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
-export default HomePage;

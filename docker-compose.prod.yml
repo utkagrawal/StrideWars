@@ -1,0 +1,92 @@
+services:
+  # ── PostgreSQL 16 (Production) ────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: stridewars_postgres_prod
+    restart: always
+    env_file:
+      - .env.prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stridewars"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Redis 7 (Production) ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: stridewars_redis_prod
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── Backend API (Production) ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      target: runner
+    container_name: stridewars_backend_prod
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379
+    # No volume mounts in production — we use the baked-in code
+
+  # ── Background Worker (Production) ────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      target: runner
+    container_name: stridewars_worker_prod
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379
+    command: npm run worker:start
+    # No volume mounts in production
+
+  # ── Frontend (Production) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      target: runner
+    container_name: stridewars_frontend_prod
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    # No volume mounts — Nginx serves the pre-built React assets directly.
+    # Nginx also proxies /api to the backend container internally.
+
+# ── Named volumes ───────────────────────────────────────────────────────────
+volumes:
+  postgres_prod_data:
+    driver: local

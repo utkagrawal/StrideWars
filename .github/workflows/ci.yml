@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: stridewars
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: stridewars_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run Backend Unit Tests
+      run: npm run test:unit --workspace=backend
+      
+    - name: Run Backend Integration & E2E Tests
+      run: npm run test:integration --workspace=backend
+      env:
+        DATABASE_URL: postgresql://stridewars:changeme@localhost:5433/stridewars_test
+        REDIS_URL: redis://localhost:6379/1
+        JWT_SECRET: test_jwt_secret_12345
+        NODE_ENV: test
+
+    - name: Run Frontend Tests
+      run: npm run test --workspace=frontend

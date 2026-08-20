@@ -1,25 +1,48 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { z } from 'zod';
 
-// Load .env from backend root
+// Load .env from the backend directory root (one level above src/)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-export const env = {
-  NODE_ENV: process.env.NODE_ENV ?? 'development',
-  PORT: parseInt(process.env.PORT ?? '3001', 10),
+// ── Environment schema ──────────────────────────────────────────────────────
+// Required vars fail fast with a descriptive error at startup.
+// Optional vars fall back to safe development defaults.
 
-  // Database (Phase 2)
-  DATABASE_URL: process.env.DATABASE_URL ?? '',
-  DB_HOST: process.env.DB_HOST ?? 'localhost',
-  DB_PORT: parseInt(process.env.DB_PORT ?? '5432', 10),
-  DB_NAME: process.env.DB_NAME ?? 'stridewars',
-  DB_USER: process.env.DB_USER ?? 'postgres',
-  DB_PASSWORD: process.env.DB_PASSWORD ?? '',
+const envSchema = z.object({
+  // Server
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3001),
 
-  // Redis (Phase 2)
-  REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379',
+  // Database — required; no safe default possible
+  DATABASE_URL: z
+    .string()
+    .min(1, 'DATABASE_URL is required. Copy backend/.env.example → backend/.env and set it.'),
+
+  // Redis — required; no safe default possible
+  REDIS_URL: z
+    .string()
+    .min(1, 'REDIS_URL is required. Copy backend/.env.example → backend/.env and set it.'),
 
   // Auth (Phase 3)
-  JWT_SECRET: process.env.JWT_SECRET ?? 'change-me-in-production',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '7d',
-} as const;
+  JWT_SECRET: z.string().default('change-me-in-production'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
+
+  // CORS
+  CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:5174'),
+});
+
+// ── Fail fast ───────────────────────────────────────────────────────────────
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const issues = parsed.error.issues.map((i) => `  • ${i.path.join('.')}: ${i.message}`).join('\n');
+  // Use process.stderr directly — logger may not be initialised yet
+  process.stderr.write(
+    `\n❌ Invalid environment configuration:\n${issues}\n\nCheck backend/.env.example for required variables.\n\n`
+  );
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;

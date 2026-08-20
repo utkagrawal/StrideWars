@@ -1,33 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
 
-export interface AppError extends Error {
-  statusCode?: number;
+interface CustomError extends Error {
   code?: string;
+  statusCode?: number;
 }
 
-/**
- * Centralized error handler middleware.
- * Must be registered LAST in the Express middleware chain.
- *
- * Responds with a consistent JSON error shape:
- *   { error: string; code?: string }
- */
-export function errorHandler(
-  err: AppError,
+export const errorHandler = (
+  err: CustomError,
   _req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
-): void {
-  const statusCode = err.statusCode ?? 500;
-  const message = err.message || 'Internal Server Error';
-  const code = err.code ?? 'INTERNAL_ERROR';
+): void | Response => {
+  // eslint-disable-next-line no-console
+  console.error('[Error]', err);
 
-  // TODO: Replace with a proper logger (e.g., pino) in Phase 2
-  if (statusCode >= 500) {
-    // eslint-disable-next-line no-console
-    console.error('[ErrorHandler]', err);
+  // Handle Postgres unique constraint violation
+  if (err.code === '23505') {
+    return res.status(409).json({
+      error: {
+        code: 'CONFLICT',
+        message: 'A user with that email or username already exists.',
+      },
+    });
   }
 
-  res.status(statusCode).json({ error: message, code });
-}
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+
+  return res.status(statusCode).json({
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message,
+    },
+  });
+};

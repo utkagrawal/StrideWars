@@ -12,7 +12,13 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspace=backend",
-    "lint": "npm run lint --workspaces"
+    "test:integration": "npm run test:integration --workspace=backend",
+    "lint": "npm run lint --workspaces",
+    "setup": "bash scripts/setup.sh",
+    "start:prod": "docker compose -f docker-compose.prod.yml up -d",
+    "infra:up": "bash scripts/infra-up.sh",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v"
   },
   "engines": {
     "node": ">=20.0.0"
