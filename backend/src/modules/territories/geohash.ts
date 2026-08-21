@@ -35,3 +35,32 @@ export function getGeohashesInBbox(
 ): string[] {
   return ngeohash.bboxes(minLat, minLng, maxLat, maxLng, precision);
 }
+
+import { getPolygonBoundingBox, isPointInPolygon } from '../../utils/geo';
+import type { Point } from '../../utils/geo';
+
+/**
+ * Computes all geohashes whose center points fall within the given closed polygon track.
+ * Returns a lexicographically sorted array of geohashes (to prevent deadlocks when locking).
+ */
+export function computeIntersectingGeohashes(
+  closedPoints: Point[],
+  precision: number = GEOHASH_PRECISION
+): string[] {
+  if (closedPoints.length < 4) return [];
+
+  const bbox = getPolygonBoundingBox(closedPoints);
+  const candidateHashes = getGeohashesInBbox(bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng, precision);
+  
+  const insideHashes: string[] = [];
+  for (const hash of candidateHashes) {
+    const center = decodeGeohash(hash);
+    if (isPointInPolygon(center, closedPoints)) {
+      insideHashes.push(hash);
+    }
+  }
+  
+  // Sort lexicographically to prevent deadlocks!
+  insideHashes.sort();
+  return insideHashes;
+}

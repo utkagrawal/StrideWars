@@ -27,7 +27,7 @@ export interface RunPoint {
   recorded_at: Date;
 }
 
-import { decodeGeohash, getGeohashesInBbox } from '../territories/geohash';
+import { decodeGeohash, computeIntersectingGeohashes } from '../territories/geohash';
 import { updateScores } from '../leaderboards/leaderboards.service';
 
 export async function createRun(
@@ -62,20 +62,7 @@ export async function createRun(
 
   let uniqueHashes: string[] = [];
   if (closedPoints.length >= 4 && enclosedAreaSquareMeters >= 200) {
-    const bbox = getPolygonBoundingBox(closedPoints);
-    const candidateHashes = getGeohashesInBbox(bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng);
-    
-    const insideHashes: string[] = [];
-    for (const hash of candidateHashes) {
-      const center = decodeGeohash(hash);
-      if (isPointInPolygon(center, closedPoints)) {
-        insideHashes.push(hash);
-      }
-    }
-    
-    // Sort lexicographically to prevent deadlocks!
-    insideHashes.sort();
-    uniqueHashes = insideHashes;
+    uniqueHashes = computeIntersectingGeohashes(closedPoints);
   }
 
   const result = await withTransaction(async (client) => {
