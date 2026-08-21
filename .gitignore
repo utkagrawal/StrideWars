@@ -45,3 +45,10 @@ Thumbs.db
 
 # Docker
 *.env.docker
+
+# Local and Dumps
+.local/
+*.sql
+*.dump
+*.tar
+*.gz

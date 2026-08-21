@@ -1,4 +1,5 @@
 # StrideWars 🏃‍♂️⚔️
+![CI Status](https://github.com/utkagrawal/StrideWars/actions/workflows/ci.yml/badge.svg)
 
 **A competitive running platform where you capture geographic territories by running through them and battle for supremacy on global leaderboards.**
 

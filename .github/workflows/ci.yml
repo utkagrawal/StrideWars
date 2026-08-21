@@ -47,6 +47,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Lint Codebase
+      run: npm run lint
+
+    - name: Build Codebase
+      run: npm run build
+
     - name: Run Backend Unit Tests
       run: npm run test:unit --workspace=backend
       
