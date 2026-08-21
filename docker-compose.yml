@@ -62,6 +62,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
       redis:
         condition: service_healthy
     env_file:
@@ -88,6 +90,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
       redis:
         condition: service_healthy
     env_file:
