@@ -11,19 +11,28 @@ Based on the load testing results documented in [`docs/benchmarks.md`](benchmark
 3. **Database Connection Limits**: The throughput for write paths tops out at ~350 req/sec not because of CPU, but because the raw Postgres connection pool becomes saturated holding transactions open during geohash intersections.
 4. **No Read Replica Yet**: All analytical read loads (like feed generation) compete for I/O with our critical, transaction-heavy write paths (territory claiming).
 
-### The First Bottlenecks (10x - 1000x Load)
+### The First Bottlenecks (10x - 100x Load)
 
 1. **At 10x Load (Cache Invalidation Storm)**
    - *Bottleneck*: Regenerating the leaderboard user details from Postgres.
    - *Evidence*: Previously, every territory capture manually `DEL`ed the leaderboard cache. At 10 runs per second, the cache would never hit, sending thousands of hydration queries to Postgres.
    - *Mitigation*: Removed manual invalidation. We now rely strictly on a 30s TTL to absorb the "thundering herd."
-2. **At 100x Load (Connection Exhaustion)**
-   - *Bottleneck*: Postgres running out of connections if Node.js pods horizontally scale.
-   - *Evidence*: 50 Node pods * 20 connections = 1000 connections, crashing standard Postgres.
-   - *Mitigation*: Introduce **PgBouncer** in transaction-pooling mode.
-3. **At 1000x Load (Write Contention on Jobs/Captures)**
-   - *Bottleneck*: `FOR UPDATE SKIP LOCKED` on a single Postgres `jobs` table will experience high lock contention and disk I/O bottlenecks.
-   - *Mitigation*: Move async jobs out of Postgres and into a dedicated Redis queue (**BullMQ**).
+
+2. **At 100x Load (Write Contention & Connection Exhaustion)**
+   - *Bottleneck*: Node.js event loop blocking during geospatial calculations, combined with Postgres connection pool exhaustion.
+   - *Evidence*: The `POST /api/runs` endpoint does heavy CPU work (Douglas-Peucker simplification, geohash intersections) *and* holds a Postgres transaction open during the `FOR UPDATE SKIP LOCKED` captures. At 100x load (~3,500 req/sec), a single Node.js instance will peg its CPU, forcing us to horizontally scale the Node API pods. However, 50 Node pods * 20 connections = 1000 connections, which will instantly crash a standard Postgres instance.
+   - *Mitigation*: We must introduce **PgBouncer** in transaction-pooling mode to allow Node instances to scale without exceeding Postgres connection limits.
+
+### Breaking the Monolith (The First Extraction)
+
+When the modular monolith finally hits a hard physical limit (likely around 100x-500x load depending on hardware), we will not rewrite the entire app into microservices. Instead, we will perform a targeted extraction.
+
+**The First Service to Extract: The "Runs & Territory Engine"**
+- **Why?** The workloads in StrideWars are highly asymmetric. `GET /api/social/feed` and `GET /api/leaderboards` are IO-bound read paths. `POST /api/runs` is a CPU-bound, transaction-heavy write path.
+- **How?** Because we strictly adhered to the modular monolith pattern (no shared in-memory state, strictly separated domains), we can simply deploy a second copy of the exact same codebase but route all traffic differently at the load balancer/Nginx level.
+  - **API Cluster (Reads)**: Handles `/api/users`, `/api/social`, `/api/leaderboards`. These pods can run on cheap, low-CPU instances and scale massively.
+  - **Capture Cluster (Writes)**: Handles only `POST /api/runs`. These pods can be provisioned on high-CPU instances optimized for geospatial math and coordinate directly with the master Postgres instance.
+- **Conclusion**: By extracting only the write-heavy domain into a separate deployment tier, we buy ourselves another massive runway of scale without introducing complex distributed sagas or gRPC.
 
 ## Ordered Horizontal Scaling Path
 

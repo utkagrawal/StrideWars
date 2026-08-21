@@ -76,6 +76,9 @@
   ```
 - **Response**: `201 Created` or `200 OK` (if idempotent replay)
   - `{ "run": { "id", "distance_meters", "duration_seconds", "avg_pace_sec_per_km" } }`
+- **Errors**:
+  - `422 Unprocessable Entity`: "VALIDATION_ERROR" if the run exceeds 5,000,000 m² enclosed area.
+  - `422 Unprocessable Entity`: "VALIDATION_ERROR" (Spoofing Protection) if the average pace is faster than 90 seconds/km (40 km/h) over a distance > 200m, indicating the user is in a vehicle or spoofing GPS.
 
 **GET `/api/runs`**
 - **Query**: `?limit=20&cursor=2023-01-01T10:00:00Z`

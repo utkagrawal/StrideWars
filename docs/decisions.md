@@ -373,3 +373,30 @@ Phase 25 addressed two regressions that appeared after the Phase 24 modification
 ### Consequences
 - The GPS readout now genuinely reflects the physical tracking rate. 
 - Avoided adding a redundant HTTP client dependency to the backend.
+
+---
+
+## ADR 016: Geospatial Indexing (Geohash vs. Quadtree vs. R-Tree)
+**Date**: Phase 5 (Interview Prep)
+
+### Context
+StrideWars requires a highly scalable mechanism for checking which map cells a user's run path intersects and persisting ownership of those cells. We needed to choose the fundamental spatial data structure for this workload. The primary candidates were **Geohash**, **Quadtree**, and **R-Tree** (via PostGIS).
+
+### Decision
+We chose **Geohash** (specifically string-based geohashes stored in standard Postgres `TEXT` columns with B-Tree/Bitmap indexing) as the core spatial representation for territories, avoiding native PostGIS R-Trees for the critical write path.
+
+### Rationale
+
+1. **Write Scale & Contention**: 
+   Our most critical path is `POST /api/runs`, which performs highly contested writes. During a run, a user captures cells. If we used an R-Tree via PostGIS (`geometry` column) to represent abstract polygon ownership, locking concurrent updates to overlapping geometries becomes extremely complex and prone to deadlocks. 
+   With Geohash, the world is pre-divided into a deterministic grid of text strings. This allows us to use `INSERT ... ON CONFLICT (geohash) DO NOTHING` followed by a deterministic `SELECT ... FOR UPDATE SKIP LOCKED` on the exact string keys. We can sort the geohash strings lexicographically before requesting locks, completely eliminating circular deadlocks under high concurrency.
+   
+2. **Database Simplicity vs Library Support**: 
+   Quadtrees (like S2 geometry or H3 hexagons) offer more uniform cell sizes globally. However, H3 and S2 require native Postgres extensions that aren't natively supported on all managed DB providers without custom images. Geohash is natively supported in Node.js via lightweight libraries (e.g., `ngeohash`) and requires zero database extensions. We generate the hashes in Node.js and simply store them as `TEXT` in Postgres.
+
+3. **Cell-Boundary Tradeoffs (The Pole Problem)**: 
+   Geohash grid cells become distorted closer to the poles compared to H3 hexagons. However, for a gamified running app where 99% of users are located in mid-latitudes, the distortion is an acceptable trade-off for the sheer simplicity of string-prefix searches (e.g., `LIKE '9q8%'` for a regional leaderboard) and exact-match string locking.
+
+### Alternatives Considered
+- **PostGIS R-Tree (`geometry`)**: Ideal for complex, arbitrary polygon overlaps, but introduces massive transaction overhead and locking complexity when attempting to resolve "last capture wins" for overlapping polygons at high write scale.
+- **Uber's H3 (Hexagons)**: Visually superior and maintains uniform area globally, but adds significant deployment friction due to requiring Postgres extensions for database-side manipulation, or storing integer IDs that lack the easy prefix-search capabilities of Geohash strings.

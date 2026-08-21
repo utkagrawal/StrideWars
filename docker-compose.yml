@@ -19,6 +19,25 @@ services:
       retries: 10
       start_period: 10s
 
+  # ── PgBouncer (Transaction Pooling) ───────────────────────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: stridewars_pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_USER: ${POSTGRES_USER:-stridewars}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+    ports:
+      - "6432:5432"
+
   # ── Redis 7 ───────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -49,8 +68,8 @@ services:
       - ./backend/.env
     environment:
       PORT: 3000
-      POSTGRES_HOST: postgres
-      DATABASE_URL: postgresql://stridewars:changeme@postgres:5432/stridewars
+      POSTGRES_HOST: pgbouncer
+      DATABASE_URL: postgresql://stridewars:changeme@pgbouncer:5432/stridewars
       REDIS_URL: redis://redis:6379
     volumes:
       - ./backend:/app
@@ -74,8 +93,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      POSTGRES_HOST: postgres
-      DATABASE_URL: postgresql://stridewars:changeme@postgres:5432/stridewars
+      POSTGRES_HOST: pgbouncer
+      DATABASE_URL: postgresql://stridewars:changeme@pgbouncer:5432/stridewars
       REDIS_URL: redis://redis:6379
     volumes:
       - ./backend:/app

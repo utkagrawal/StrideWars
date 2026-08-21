@@ -50,6 +50,16 @@ export async function createRun(
   
   const avgPace = calculatePace(distanceMeters, durationSeconds);
 
+  // Spoofing / Abuse Protection (Phase 5)
+  // World record marathon pace is ~175 sec/km. Usain Bolt's top sprint is ~58 sec/km.
+  // If the average pace is faster than 90 sec/km (40km/h) over a distance > 200m, reject it.
+  if (distanceMeters > 200 && avgPace < 90) {
+    const error = new Error('Run rejected: Average pace is physically impossible on foot. Please turn off your car or GPS spoofer.');
+    (error as any).statusCode = 422;
+    (error as any).code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
   const closedPoints = autoClosePath(sortedPoints, 30);
   const enclosedAreaSquareMeters = polygonArea(closedPoints);
   

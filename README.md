@@ -106,5 +106,5 @@ StrideWars was built with a strong emphasis on architectural documentation and e
 As detailed in `docs/scalability.md`, the next logical steps for scaling the platform are:
 1. **CDN Caching**: Offload React bundles to Cloudflare.
 2. **Read Replicas**: Offload `GET /api/runs` and `GET /api/territories` to Postgres replicas.
-3. **PgBouncer**: Implement connection pooling to allow horizontal scaling of the Node.js API pods.
+3. **~~PgBouncer~~** (Implemented Phase 5): Connection pooling allows horizontal scaling of the Node.js API pods.
 4. **BullMQ**: Migrate the background worker from Postgres `jobs` to a dedicated Redis queue.
