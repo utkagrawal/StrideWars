@@ -3,6 +3,10 @@
 
 **A competitive running platform where you capture geographic territories by running through them and battle for supremacy on global leaderboards.**
 
+**[🔴 Live Demo (Render Free Tier)](https://stridewars.onrender.com)**
+
+*I built StrideWars to showcase my ability to design and implement a complex, concurrency-safe modular monolith. It demonstrates hands-on experience with geospatial data, deterministic database locking for highly contested writes, and O(log N) Redis-backed real-time leaderboards, all profiled and optimized for scale.*
+
 ---
 
 ## Project Overview
@@ -90,9 +94,10 @@ StrideWars was built with a strong emphasis on architectural documentation and e
 
 ---
 
-## Screenshots (Placeholder)
+## Live Demo Walkthrough
 
-*(Insert screenshots of the Dashboard, Map View, Leaderboard, and Record Run pages here)*
+*(Replace this placeholder with a 30-60s GIF/MP4 showing: login → live map → uploading a run → a territory being claimed/stolen → leaderboard updating)*
+![StrideWars Demo](docs/assets/demo-placeholder.gif)
 
 ---
 

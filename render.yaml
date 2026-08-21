@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: stridewars-backend
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stridewars-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: stridewars-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: web
+    name: stridewars-frontend
+    env: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://stridewars-backend.onrender.com/api
+
+  - type: worker
+    name: stridewars-worker
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run worker:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stridewars-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: stridewars-redis
+          property: connectionString
+
+  - type: pserv
+    name: stridewars-redis
+    env: docker
+    repo: https://github.com/render-examples/redis.git
+    plan: free
+
+databases:
+  - name: stridewars-db
+    databaseName: stridewars
+    user: stridewars
+    plan: free
