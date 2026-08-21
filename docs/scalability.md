@@ -2,13 +2,14 @@
 
 > **Status**: Placeholder — updated as load characteristics are identified
 
-## Phase 14 Current Limits & Anticipated Bottlenecks (Evidence-Based)
+## Current Bottlenecks (Based on Phase 3 Benchmarks)
 
-Under a seeded load of 5,000 users, 50,000 runs, and 10,000 territory captures, we performed native `EXPLAIN ANALYZE` profiling.
-- **Run History (`GET /api/runs`)**: ~0.6ms (Bitmap Index Scan on `user_id, created_at`)
-- **Territory Bbox (`GET /api/territories`)**: ~0.1ms (Bitmap Index Scan on `geohash`)
-- **Social Feed (`GET /api/social/feed`)**: ~1.7ms (CTE Merge Sort via Index Scans)
-- **Leaderboards (`GET /api/leaderboards/global`)**: Redis $O(\log N)$ ZREVRANGE + Postgres Hydration (~0.1ms).
+Based on the load testing results documented in [`docs/benchmarks.md`](benchmarks.md), our current baseline architecture (Single Node.js instance, Single Postgres DB, Single Redis instance) exposes the following honest bottlenecks:
+
+1. **Social Feed Degradation for Power Users**: While p50 latency is excellent (15ms), users following >1,000 people will experience p99 latencies nearing 70ms. The bottleneck here is the top-N heapsort in Postgres during the CTE UNION of `runs` and `territory_captures`.
+2. **Transaction Contention on "Hot" Cells**: Claiming highly contested territories causes p99 latency to spike to ~280ms due to row-level `FOR UPDATE SKIP LOCKED` wait times.
+3. **Database Connection Limits**: The throughput for write paths tops out at ~350 req/sec not because of CPU, but because the raw Postgres connection pool becomes saturated holding transactions open during geohash intersections.
+4. **No Read Replica Yet**: All analytical read loads (like feed generation) compete for I/O with our critical, transaction-heavy write paths (territory claiming).
 
 ### The First Bottlenecks (10x - 1000x Load)
 
