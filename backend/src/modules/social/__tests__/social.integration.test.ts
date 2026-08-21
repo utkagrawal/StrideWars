@@ -113,10 +113,10 @@ describe('Social Integration', () => {
 
     // User 2 runs
     const points2 = [
-      { lat: 38.0, lng: -122.0, recordedAt: new Date(Date.now() - 13000).toISOString() },
-      { lat: 38.005, lng: -122.0, recordedAt: new Date(Date.now() - 12000).toISOString() },
-      { lat: 38.005, lng: -122.005, recordedAt: new Date(Date.now() - 11000).toISOString() },
-      { lat: 38.0, lng: -122.005, recordedAt: new Date(Date.now() - 10000).toISOString() },
+      { lat: 38.0, lng: -122.0, recordedAt: new Date(Date.now() - 13 * 60000).toISOString() },
+      { lat: 38.005, lng: -122.0, recordedAt: new Date(Date.now() - 11 * 60000).toISOString() },
+      { lat: 38.005, lng: -122.005, recordedAt: new Date(Date.now() - 9 * 60000).toISOString() },
+      { lat: 38.0, lng: -122.005, recordedAt: new Date(Date.now() - 7 * 60000).toISOString() },
     ];
     await request(app)
       .post('/api/runs')
@@ -126,10 +126,10 @@ describe('Social Integration', () => {
 
     // User 3 runs
     const points3 = [
-      { lat: 39.0, lng: -122.0, recordedAt: new Date(Date.now() - 8000).toISOString() },
-      { lat: 39.005, lng: -122.0, recordedAt: new Date(Date.now() - 7000).toISOString() },
-      { lat: 39.005, lng: -122.005, recordedAt: new Date(Date.now() - 6000).toISOString() },
-      { lat: 39.0, lng: -122.005, recordedAt: new Date(Date.now() - 5000).toISOString() },
+      { lat: 39.0, lng: -122.0, recordedAt: new Date(Date.now() - 8 * 60000).toISOString() },
+      { lat: 39.005, lng: -122.0, recordedAt: new Date(Date.now() - 6 * 60000).toISOString() },
+      { lat: 39.005, lng: -122.005, recordedAt: new Date(Date.now() - 4 * 60000).toISOString() },
+      { lat: 39.0, lng: -122.005, recordedAt: new Date(Date.now() - 2 * 60000).toISOString() },
     ];
     await request(app)
       .post('/api/runs')

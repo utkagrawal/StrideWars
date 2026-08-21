@@ -25,6 +25,7 @@ router.get(
   '/region',
   [
     query('geohashPrefix')
+      .optional()
       .isString()
       .isLength({ min: 1, max: 12 })
       .withMessage('Valid geohashPrefix is required'),

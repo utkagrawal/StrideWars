@@ -43,10 +43,10 @@ describe('Notifications & Background Worker Integration', () => {
   it('enqueues a job when territory is recaptured, processes it, and serves the notification', async () => {
     // 1. User 1 captures territory
     const points1 = [
-      { lat: 37.0, lng: -122.0, recordedAt: new Date(Date.now() - 10000).toISOString() },
-      { lat: 37.005, lng: -122.0, recordedAt: new Date(Date.now() - 9000).toISOString() },
-      { lat: 37.005, lng: -122.005, recordedAt: new Date(Date.now() - 8000).toISOString() },
-      { lat: 37.0, lng: -122.005, recordedAt: new Date(Date.now() - 7000).toISOString() },
+      { lat: 37.0, lng: -122.0, recordedAt: new Date(Date.now() - 10 * 60000).toISOString() },
+      { lat: 37.005, lng: -122.0, recordedAt: new Date(Date.now() - 8 * 60000).toISOString() },
+      { lat: 37.005, lng: -122.005, recordedAt: new Date(Date.now() - 6 * 60000).toISOString() },
+      { lat: 37.0, lng: -122.005, recordedAt: new Date(Date.now() - 4 * 60000).toISOString() },
     ];
     const r1 = await request(app)
       .post('/api/runs')
@@ -58,7 +58,7 @@ describe('Notifications & Background Worker Integration', () => {
     // 2. User 2 recaptures same territory
     const points2 = points1.map((p) => ({
       ...p,
-      recordedAt: new Date(new Date(p.recordedAt).getTime() + 20000).toISOString(),
+      recordedAt: new Date(new Date(p.recordedAt).getTime() + 20 * 60000).toISOString(),
     }));
     const r2 = await request(app)
       .post('/api/runs')

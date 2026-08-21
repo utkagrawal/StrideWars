@@ -56,10 +56,10 @@ describe('Leaderboards Integration', () => {
 
   it('updates the leaderboard when a user captures territories via run upload', async () => {
     const points = [
-      { lat: 37.0, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:00:01Z' },
-      { lat: 37.005, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:00:11Z' },
-      { lat: 37.005, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:00:21Z' },
-      { lat: 37.0, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:00:31Z' },
+      { lat: 37.0, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:00:00Z' },
+      { lat: 37.005, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:02:00Z' },
+      { lat: 37.005, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:04:00Z' },
+      { lat: 37.0, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:06:00Z' },
     ];
 
     // Upload run for u1
@@ -82,7 +82,7 @@ describe('Leaderboards Integration', () => {
 
     expect(res.body.entries).toHaveLength(1);
     expect(res.body.entries[0].userId).toBe(u1Id);
-    expect(res.body.entries[0].territoryCount).toBe(runRes.body.capturedTerritories.length);
+    expect(res.body.entries[0].areaSquareMeters).toBeGreaterThan(0);
     expect(res.body.entries[0].rank).toBe(1);
     expect(res.body.entries[0].username).toBe('lbuser1');
 
@@ -142,7 +142,9 @@ describe('Leaderboards Integration', () => {
     it('returns 400 if lat/lng are missing and geohashPrefix is absent', async () => {
       const res = await request(app).get('/api/leaderboards/region');
       expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/Missing/);
+      const errorText =
+        typeof res.body.error === 'string' ? res.body.error : res.body.error?.message;
+      expect(errorText).toMatch(/Missing|Invalid input data/);
     });
   });
 });

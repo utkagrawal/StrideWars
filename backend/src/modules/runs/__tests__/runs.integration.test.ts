@@ -42,7 +42,7 @@ describe('Runs Integration', () => {
       points.push({
         lat: 37.7749 + i * 0.001,
         lng: -122.4194 + i * 0.001,
-        recordedAt: new Date(baseDate + i * 1000).toISOString(),
+        recordedAt: new Date(baseDate + i * 120000).toISOString(),
       });
     }
     return points;
@@ -85,7 +85,7 @@ describe('Runs Integration', () => {
       expect(res.body.run.client_run_id).toBe(clientRunId);
       expect(res.body.run.user_id).toBe(userId);
       expect(parseFloat(res.body.run.distance_meters)).toBeGreaterThan(0);
-      expect(res.body.run.duration_seconds).toBe(4); // 5 points, 1s apart = 4 seconds duration
+      expect(res.body.run.duration_seconds).toBe(480); // 5 points, 2m apart = 8 minutes duration
       expect(parseFloat(res.body.run.avg_pace_sec_per_km)).toBeGreaterThan(0);
     });
 
@@ -132,7 +132,7 @@ describe('Runs Integration', () => {
         densePoints.push({
           lat: 37.7 + i * 0.0001, // Basically a straight line
           lng: -122.4 + i * 0.0001,
-          recordedAt: new Date(baseDate + i * 1000).toISOString(),
+          recordedAt: new Date(baseDate + i * 20000).toISOString(),
         });
       }
 

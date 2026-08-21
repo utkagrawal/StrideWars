@@ -2,9 +2,22 @@ import { pool } from '../../config/db';
 import { claimAndProcessJob } from '../index';
 
 describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
+  const previousOwnerId = '00000000-0000-0000-0000-000000000000';
+  const newOwnerId = '11111111-1111-1111-1111-111111111111';
+
   beforeAll(async () => {
     await pool.query('DELETE FROM notifications');
     await pool.query('DELETE FROM jobs');
+    await pool.query('DELETE FROM users WHERE id = $1 OR id = $2', [previousOwnerId, newOwnerId]);
+    await pool.query(
+      `
+      INSERT INTO users (id, username, email, password_hash)
+      VALUES
+        ($1, 'worker_prev_owner', 'worker_prev_owner@test.com', 'test_hash'),
+        ($2, 'worker_new_owner', 'worker_new_owner@test.com', 'test_hash')
+      `,
+      [previousOwnerId, newOwnerId]
+    );
   });
 
   afterAll(async () => {
@@ -26,8 +39,8 @@ describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
       [
         'territory_lost_notification',
         {
-          previousOwnerId: '00000000-0000-0000-0000-000000000000',
-          newOwnerId: '11111111-1111-1111-1111-111111111111',
+          previousOwnerId,
+          newOwnerId,
           geohash: 'gbsuv7y',
         },
       ]

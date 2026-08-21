@@ -62,9 +62,9 @@ describe('Territory Capture Integration', () => {
 
     const points = [
       { ...pt1, recordedAt: '2023-01-01T10:00:00Z' },
-      { ...pt2, recordedAt: '2023-01-01T10:00:10Z' },
-      { ...pt3, recordedAt: '2023-01-01T10:00:20Z' },
-      { ...pt4, recordedAt: '2023-01-01T10:00:30Z' },
+      { ...pt2, recordedAt: '2023-01-01T10:02:00Z' },
+      { ...pt3, recordedAt: '2023-01-01T10:04:00Z' },
+      { ...pt4, recordedAt: '2023-01-01T10:06:00Z' },
     ];
 
     const clientRunId = crypto.randomUUID();
@@ -83,9 +83,9 @@ describe('Territory Capture Integration', () => {
     // 3 users run the exact same square at the exact same time
     const run1Points = [
       { lat: 38.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
-      { lat: 38.005, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
-      { lat: 38.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
-      { lat: 38.0, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' },
+      { lat: 38.005, lng: -122.0, recordedAt: '2023-01-01T10:02:00Z' },
+      { lat: 38.005, lng: -122.005, recordedAt: '2023-01-01T10:04:00Z' },
+      { lat: 38.0, lng: -122.005, recordedAt: '2023-01-01T10:06:00Z' },
     ];
 
     const run2Points = [...run1Points].reverse(); // User 2 ran it backwards
@@ -100,13 +100,13 @@ describe('Territory Capture Integration', () => {
 
     const p2 = request(app).post('/api/runs').set('Authorization', `Bearer ${user2Token}`).send({
       clientRunId: crypto.randomUUID(),
-      startedAt: run2Points[0].recordedAt,
+      startedAt: run1Points[0].recordedAt,
       points: run2Points,
     });
 
     const p3 = request(app).post('/api/runs').set('Authorization', `Bearer ${user3Token}`).send({
       clientRunId: crypto.randomUUID(),
-      startedAt: run3Points[0].recordedAt,
+      startedAt: run1Points[0].recordedAt,
       points: run3Points,
     });
 
@@ -135,9 +135,9 @@ describe('Territory Capture Integration', () => {
   it('is idempotent and does not double-capture on replay', async () => {
     const points = [
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
-      { lat: 39.005, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
-      { lat: 39.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
-      { lat: 39.0, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' },
+      { lat: 39.005, lng: -122.0, recordedAt: '2023-01-01T10:02:00Z' },
+      { lat: 39.005, lng: -122.005, recordedAt: '2023-01-01T10:04:00Z' },
+      { lat: 39.0, lng: -122.005, recordedAt: '2023-01-01T10:06:00Z' },
     ];
     const clientRunId = crypto.randomUUID();
 
@@ -165,9 +165,9 @@ describe('Territory Capture Integration', () => {
     // 1 degree is roughly 111km. 1 degree square is ~12,321,000,000 m^2
     const points = [
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
-      { lat: 40.0, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
-      { lat: 40.0, lng: -123.0, recordedAt: '2023-01-01T10:00:20Z' },
-      { lat: 39.0, lng: -123.0, recordedAt: '2023-01-01T10:00:30Z' },
+      { lat: 40.0, lng: -122.0, recordedAt: '2023-01-01T13:00:00Z' },
+      { lat: 40.0, lng: -123.0, recordedAt: '2023-01-01T16:00:00Z' },
+      { lat: 39.0, lng: -123.0, recordedAt: '2023-01-01T19:00:00Z' },
     ];
     const clientRunId = crypto.randomUUID();
 
@@ -184,8 +184,8 @@ describe('Territory Capture Integration', () => {
   it('gracefully handles a straight line (zero area)', async () => {
     const points = [
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
-      { lat: 39.001, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
-      { lat: 39.002, lng: -122.0, recordedAt: '2023-01-01T10:00:20Z' },
+      { lat: 39.001, lng: -122.0, recordedAt: '2023-01-01T10:00:30Z' },
+      { lat: 39.002, lng: -122.0, recordedAt: '2023-01-01T10:01:00Z' },
     ];
     const clientRunId = crypto.randomUUID();
 

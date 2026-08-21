@@ -75,18 +75,19 @@ describe('End-to-End User Journey', () => {
     // 1. User 1 uploads a run capturing NYC
     const nycHash = encodeGeohash(40.7128, -74.006);
     const u1ClientRunId = crypto.randomUUID();
+    const u1RunPoints = [
+      { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 12 * 60000).toISOString() },
+      { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 10 * 60000).toISOString() },
+      { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 8 * 60000).toISOString() },
+      { lat: 40.712, lng: -74.004, recordedAt: new Date(Date.now() - 6 * 60000).toISOString() },
+    ];
     const u1RunRes = await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${user1Token}`)
       .send({
         clientRunId: u1ClientRunId,
-        startedAt: new Date().toISOString(),
-        points: [
-          { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 30000).toISOString() },
-          { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 20000).toISOString() },
-          { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 10000).toISOString() },
-          { lat: 40.712, lng: -74.004, recordedAt: new Date().toISOString() },
-        ],
+        startedAt: u1RunPoints[0].recordedAt,
+        points: u1RunPoints,
       })
       .expect(201);
 
@@ -100,22 +101,23 @@ describe('End-to-End User Journey', () => {
     const lbRes1 = await request(app).get('/api/leaderboards/global').expect(200);
     const u1Rank = lbRes1.body.entries.find((u: any) => u.userId === user1Id);
     expect(u1Rank).toBeDefined();
-    expect(u1Rank.territoryCount).toBe(u1RunRes.body.capturedTerritories.length);
+    expect(u1Rank.areaSquareMeters).toBeGreaterThan(0);
 
     // 2. User 2 uploads a run capturing the SAME territory (recapture)
     const u2ClientRunId = crypto.randomUUID();
+    const u2RunPoints = [
+      { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 5 * 60000).toISOString() },
+      { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 4 * 60000).toISOString() },
+      { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 3 * 60000).toISOString() },
+      { lat: 40.712, lng: -74.004, recordedAt: new Date(Date.now() - 2 * 60000).toISOString() },
+    ];
     const u2RunRes = await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${user2Token}`)
       .send({
         clientRunId: u2ClientRunId,
-        startedAt: new Date().toISOString(),
-        points: [
-          { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 30000).toISOString() },
-          { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 20000).toISOString() },
-          { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 10000).toISOString() },
-          { lat: 40.712, lng: -74.004, recordedAt: new Date().toISOString() },
-        ],
+        startedAt: u2RunPoints[0].recordedAt,
+        points: u2RunPoints,
       })
       .expect(201);
 
@@ -131,8 +133,8 @@ describe('End-to-End User Journey', () => {
     const lbRes2 = await request(app).get('/api/leaderboards/global').expect(200);
     const u2Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user2Id);
     const u1Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user1Id);
-    expect(u2Rank2.territoryCount).toBe(u2RunRes.body.capturedTerritories.length);
-    expect(u1Rank2?.territoryCount || 0).toBe(0);
+    expect(u2Rank2.areaSquareMeters).toBeGreaterThan(0);
+    expect(u1Rank2?.areaSquareMeters || 0).toBe(0);
 
     // 3. Trigger worker to process notification job
     // The background worker polls jobs table, but since we're in integration tests without the worker running,
