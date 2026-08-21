@@ -65,8 +65,7 @@ const NotificationBell = () => {
 };
 
 const RootRoute = () => {
-  const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
+  const { user } = useAuth();
   return user ? <TerritoriesMap /> : <Landing />;
 };
 

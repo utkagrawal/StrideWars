@@ -481,7 +481,6 @@ export const TerritoriesMap = () => {
     setRunState('idle');
     setRunPoints([]);
     setCaptureSummary(null);
-    setCurrentGpsLog([]);
   };
 
   const polylinePositions = runPoints.map((p) => [p.lat, p.lng] as [number, number]);

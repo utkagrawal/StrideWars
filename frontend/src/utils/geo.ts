@@ -147,7 +147,7 @@ export function traceClusterPerimeter(hashes: string[]): [number, number][][] {
   const rings: [number, number][][] = [];
 
   while (startToEdge.size > 0) {
-    const firstKey = startToEdge.keys().next().value;
+    const firstKey = startToEdge.keys().next().value as string;
     const ring: [number, number][] = [];
     let currentKey = firstKey;
 
