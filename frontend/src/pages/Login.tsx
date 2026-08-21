@@ -16,7 +16,7 @@ export const Login = () => {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       login(data.user, data.accessToken);
-      navigate('/profile');
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to login');
     }

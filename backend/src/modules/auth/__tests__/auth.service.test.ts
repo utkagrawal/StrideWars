@@ -8,12 +8,13 @@ jest.mock('jsonwebtoken', () => ({
 
 describe('Auth Service', () => {
   const mockUser: User = {
-    id: 'test-uuid',
+    id: 'user-123',
     username: 'testuser',
     email: 'test@example.com',
-    password_hash: 'hashed',
+    password_hash: 'hashed_password',
     display_name: 'Test User',
     created_at: new Date(),
+    token_version: 1,
   };
 
   describe('Password Hashing', () => {
@@ -59,7 +60,7 @@ describe('Auth Service', () => {
       const token = generateRefreshToken(mockUser);
       expect(token).toBe('mockRefreshToken');
       expect(jwt.sign).toHaveBeenCalledWith(
-        { userId: mockUser.id, username: mockUser.username },
+        { userId: mockUser.id, username: mockUser.username, tokenVersion: mockUser.token_version },
         expect.any(String),
         { expiresIn: expect.any(String) }
       );

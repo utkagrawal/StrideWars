@@ -9,6 +9,12 @@
   - **Naive Approach**: Using the Pythagorean theorem ($a^2 + b^2 = c^2$) to calculate Cartesian distance between lat/lng coordinates. This approximation fails at real-world scales due to Earth's curvature.
   - **Optimized Approach**: The Haversine formula, which computes the great-circle distance between two points on a sphere.
   - **Complexity**: $O(n)$ time where $n$ is the number of points. Space complexity is $O(1)$.
+- **Simulating Real GPS Fixes (Spherical Destination-Point Formula)**
+  - **Problem**: When demoing or testing the app without a physical GPS device, we need to generate plausible, winding GPS tracks programmatically to simulate a real runner moving at a certain pace and direction.
+  - **Naive Approach**: Simply adding/subtracting constant values from the latitude and longitude, treating the Earth as a flat 2D grid. This introduces severe geometric distortion, especially as distance or latitude increases.
+  - **Optimized Approach**: The Spherical Destination-Point formula. Given a starting `(lat, lng)`, an initial bearing (direction), and a distance (derived from pace/time), this trigonometric formula computes the exact next coordinate on the spherical globe. By combining this with a slightly jittered distance (e.g. 2-4 meters per second) and randomly adjusted bearings, we trace highly realistic, auto-closable running paths.
+  - **Complexity**: $O(1)$ time and $O(1)$ space per generated point.
+  - **Why it matters**: This guarantees the mathematical purity of our prototype testing. The generated coordinates are real, plausible GPS fixes that correctly test the downstream Haversine distance, Douglas-Peucker simplification, and Ray-Casting algorithms exactly as real device data would.
 - **Route Simplification (Douglas-Peucker Algorithm)**
   - **Problem**: Rendering or transmitting raw GPS tracks (which can contain tens of thousands of points for a long run) is slow and wastes bandwidth. 
   - **Naive Approach**: Return every single point to the frontend.
@@ -74,3 +80,32 @@
   - **Optimized Approach**: Redis-backed Fixed-Window counters using `INCR` and `EXPIRE`. When a request arrives, the server constructs a key like `rl:login:192.168.1.1` and calls `INCR`. If the returned count is `1`, an `EXPIRE` command is sent to set the TTL (e.g., 900 seconds for a 15-minute window).
   - **Complexity**: $O(1)$ time complexity for both `INCR` and `EXPIRE`. Space complexity is $O(U)$ where $U$ is the number of unique active IPs in the current window.
   - **Why it matters**: A Redis-backed implementation guarantees centralized, atomic, and extremely fast rate limiting across a distributed fleet of API servers. Using `INCR` avoids race conditions inherent in `GET` -> `count++` -> `SET` patterns.
+
+## Cell Adjacency Grouping & Edge Tracing (Phase 20)
+**Problem**: How to render hundreds of individual grid-square bounded boxes (geohashes) on the map as contiguous, organic polygons without importing a heavy spatial library like Turf.js.
+**Approach**: We use a two-step edge-cancellation algorithm:
+1. Decode each geohash into its 4 directed edges (CCW).
+2. Store each edge in a hash map. If a directed edge's exact reverse already exists in the map, both are internal shared edges between adjacent cells. Delete the reverse edge and skip inserting the new one.
+3. The remaining edges in the hash map represent the exact outer boundaries (and holes) of the contiguous clusters.
+4. Pick an edge, follow its end-vertex to the next edge's start-vertex, and trace until the loop closes. Repeat until all edges are consumed.
+
+**Complexity**: $O(N)$ where $N$ is the number of cells in the viewport, as hash map insertions, deletions, and edge traversals are all $O(1)$ operations per cell.
+
+## Road-Following Path Generation (Phase 21)
+
+- **OSM Graph Random Walk**
+  - **Problem**: Generating realistic simulated running loops for demonstration purposes. Pure mathematical circles cross over buildings and water, breaking realism.
+  - **Approach**: 
+    1. Query the Overpass API for all OpenStreetMap `highway` ways within a 500m radius of the start point.
+    2. Build an undirected adjacency list graph in memory### Core Models
+
+- **User**: Core entity (auth, profile).
+- **Run**: Represents a physical movement session. Contains metadata (distance, time) and `path_polygon` JSONB for map rendering.
+- **RunPoint**: The raw, high-resolution points captured during a run. Useful for anti-cheat and replay.
+- **Territory**: The individual chunks of land. Uses `geohash` (string) as the primary key. Stores `owner_id` and `captured_run_id` for quick grouping when drawing continuous polygons.
+- **Leaderboard**: Managed exclusively in Redis using ZSETs based on true enclosed `areaSquareMeters`. where nodes are OSM intersections/points and edges are the segments connecting them.
+    3. Find the nearest node to the requested center point using Haversine distance.
+    4. Perform a bounded random walk through the graph: pick a random connected neighbor, favoring edges that do not immediately backtrack to the previous node, until the accumulated path distance reaches the target bounds (300-800m).
+    5. Close the loop by drawing a straight line back to the start point (mimicking the `autoClosePath` behavior of a runner stopping their watch near the end of a loop).
+  - **Complexity**: $O(V + E)$ to build the graph, where $V$ is nodes and $E$ is edges within the 500m radius. The random walk takes $O(K)$ time where $K$ is the number of steps required to reach the target distance.
+  - **Why it matters**: This produces organic, highly realistic GPS tracks that follow actual street layouts, improving the perceived quality of the prototype without requiring actual physical movement from the tester.

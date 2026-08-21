@@ -30,7 +30,7 @@ export const createRun = async (
   clientRunId: string,
   startedAt: string,
   points: PointInput[]
-): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[] }> => {
+): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[]; enclosedAreaSquareMeters: number }> => {
   const { data } = await api.post('/runs', {
     clientRunId,
     startedAt,
@@ -51,4 +51,9 @@ export const getRuns = async (cursor?: string, limit: number = 20): Promise<{ ru
 export const getRunById = async (id: string, simplify: boolean = true): Promise<{ run: Run; points: RunPoint[]; pointCount: number; simplifiedPointCount: number }> => {
   const { data } = await api.get(`/runs/${id}?simplify=${simplify}`);
   return data;
+};
+
+export const generateRoadLoop = async (lat: number, lng: number): Promise<PointInput[]> => {
+  const { data } = await api.get(`/runs/generate-loop?lat=${lat}&lng=${lng}`);
+  return data.points;
 };

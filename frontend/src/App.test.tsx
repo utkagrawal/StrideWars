@@ -18,6 +18,16 @@ vi.mock('./api/notifications', () => ({
   getUnreadCount: vi.fn().mockResolvedValue({ count: 0 })
 }));
 
+Object.defineProperty(global, 'localStorage', {
+  value: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn()
+  },
+  writable: true
+});
+
 const renderApp = () => {
   return render(
     <BrowserRouter>
@@ -37,8 +47,8 @@ describe('App Shell Navigation', () => {
     renderApp();
     
     expect(screen.getByText('StrideWars')).toBeInTheDocument();
-    expect(screen.getByText('Log In')).toBeInTheDocument();
-    expect(screen.getByText('Sign Up')).toBeInTheDocument();
+    expect(screen.getAllByText('Log In').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Sign Up').length).toBeGreaterThan(0);
     
     // Auth-only links should not be present
     expect(screen.queryByText('Feed')).not.toBeInTheDocument();
@@ -56,6 +66,7 @@ describe('App Shell Navigation', () => {
     expect(screen.getByText('StrideWars')).toBeInTheDocument();
     expect(screen.getByText('Feed')).toBeInTheDocument();
     expect(screen.getByText('Map')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Runs')).toBeInTheDocument();
     expect(screen.getByText('+ Record')).toBeInTheDocument();
     expect(screen.getByText('Rankings')).toBeInTheDocument();

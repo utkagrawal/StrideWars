@@ -66,13 +66,16 @@ describe('End-to-End User Journey', () => {
         clientRunId: u1ClientRunId,
         startedAt: new Date().toISOString(),
         points: [
-          { lat: 40.7128, lng: -74.0060, recordedAt: new Date().toISOString() }
+          { lat: 40.7120, lng: -74.0070, recordedAt: new Date(Date.now() - 30000).toISOString() },
+          { lat: 40.7140, lng: -74.0070, recordedAt: new Date(Date.now() - 20000).toISOString() },
+          { lat: 40.7140, lng: -74.0040, recordedAt: new Date(Date.now() - 10000).toISOString() },
+          { lat: 40.7120, lng: -74.0040, recordedAt: new Date().toISOString() }
         ]
       })
       .expect(201);
     
-    expect(u1RunRes.body.capturedTerritories).toHaveLength(1);
-    expect(u1RunRes.body.capturedTerritories[0].geohash).toBe(nycHash);
+    expect(u1RunRes.body.capturedTerritories.length).toBeGreaterThan(0);
+    expect(u1RunRes.body.capturedTerritories.map((t: any) => t.geohash)).toContain(nycHash);
 
     // Give Redis a moment to process fire-and-forget score update
     await new Promise(r => setTimeout(r, 50));
@@ -81,7 +84,7 @@ describe('End-to-End User Journey', () => {
     const lbRes1 = await request(app).get('/api/leaderboards/global').expect(200);
     const u1Rank = lbRes1.body.entries.find((u: any) => u.userId === user1Id);
     expect(u1Rank).toBeDefined();
-    expect(u1Rank.territoryCount).toBe(1);
+    expect(u1Rank.territoryCount).toBe(u1RunRes.body.capturedTerritories.length);
 
     // 2. User 2 uploads a run capturing the SAME territory (recapture)
     const u2ClientRunId = crypto.randomUUID();
@@ -92,14 +95,19 @@ describe('End-to-End User Journey', () => {
         clientRunId: u2ClientRunId,
         startedAt: new Date().toISOString(),
         points: [
-          { lat: 40.7128, lng: -74.0060, recordedAt: new Date().toISOString() }
+          { lat: 40.7120, lng: -74.0070, recordedAt: new Date(Date.now() - 30000).toISOString() },
+          { lat: 40.7140, lng: -74.0070, recordedAt: new Date(Date.now() - 20000).toISOString() },
+          { lat: 40.7140, lng: -74.0040, recordedAt: new Date(Date.now() - 10000).toISOString() },
+          { lat: 40.7120, lng: -74.0040, recordedAt: new Date().toISOString() }
         ]
       })
       .expect(201);
 
-    expect(u2RunRes.body.capturedTerritories).toHaveLength(1);
-    expect(u2RunRes.body.capturedTerritories[0].geohash).toBe(nycHash);
-    expect(u2RunRes.body.capturedTerritories[0].previousOwnerId).toBe(user1Id); // Crucial!
+    expect(u2RunRes.body.capturedTerritories.length).toBeGreaterThan(0);
+    expect(u2RunRes.body.capturedTerritories.map((t: any) => t.geohash)).toContain(nycHash);
+    
+    const recapturedNyc = u2RunRes.body.capturedTerritories.find((t: any) => t.geohash === nycHash);
+    expect(recapturedNyc.previousOwnerId).toBe(user1Id); // Crucial!
 
     await new Promise(r => setTimeout(r, 50));
 
@@ -107,7 +115,7 @@ describe('End-to-End User Journey', () => {
     const lbRes2 = await request(app).get('/api/leaderboards/global').expect(200);
     const u2Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user2Id);
     const u1Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user1Id);
-    expect(u2Rank2.territoryCount).toBe(1);
+    expect(u2Rank2.territoryCount).toBe(u2RunRes.body.capturedTerritories.length);
     expect(u1Rank2?.territoryCount || 0).toBe(0);
 
     // 3. Trigger worker to process notification job
@@ -123,10 +131,10 @@ describe('End-to-End User Journey', () => {
       .expect(200);
     
     expect(notifRes.body.notifications.length).toBeGreaterThanOrEqual(1);
-    const lostNotif = notifRes.body.notifications.find((n: any) => n.type === 'territory_lost');
-    expect(lostNotif).toBeDefined();
-    expect(lostNotif.payload.geohash).toBe(nycHash);
-    expect(lostNotif.payload.lostToUserId).toBe(user2Id);
+    const lostNotifs = notifRes.body.notifications.filter((n: any) => n.type === 'territory_lost');
+    expect(lostNotifs.length).toBeGreaterThanOrEqual(1);
+    expect(lostNotifs.map((n: any) => n.payload.geohash)).toContain(nycHash);
+    expect(lostNotifs.some((n: any) => n.payload.lostToUserId === user2Id)).toBe(true);
 
     // 5. User 3 (fan) checks their social feed
     const feedRes = await request(app)

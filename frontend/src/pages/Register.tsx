@@ -17,7 +17,7 @@ export const Register = () => {
     try {
       const { data } = await api.post('/auth/register', { username, email, password });
       login(data.user, data.accessToken);
-      navigate('/profile');
+      navigate('/');
     } catch (err: any) {
       if (err.response?.data?.error?.code === 'VALIDATION_ERROR') {
         const details = err.response.data.error.details;

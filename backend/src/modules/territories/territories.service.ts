@@ -4,6 +4,7 @@ import { getGeohashesInBbox } from './geohash';
 export interface Territory {
   geohash: string;
   owner_id: string;
+  captured_run_id: string | null;
   owner_username: string; // from JOIN
   captured_at: Date;
   center_lat: number;
@@ -15,12 +16,12 @@ export async function getTerritoriesInBbox(
   minLng: number,
   maxLat: number,
   maxLng: number
-): Promise<Territory[]> {
+): Promise<{ territories: Territory[], runPolygons: Record<string, { lat: number, lng: number }[]> }> {
   // 1. Determine which geohash cells fall within the requested viewport
   const targetHashes = getGeohashesInBbox(minLat, minLng, maxLat, maxLng);
   
   if (targetHashes.length === 0) {
-    return [];
+    return { territories: [], runPolygons: {} };
   }
 
   // Cap the maximum number of hashes we query at once to prevent abusive massive queries
@@ -30,14 +31,30 @@ export async function getTerritoriesInBbox(
 
   // 2. Fetch those cells from the DB, joining with users to get the owner's username
   const { rows } = await pool.query(
-    `SELECT t.geohash, t.owner_id, t.captured_at, t.center_lat, t.center_lng, u.username as owner_username
+    `SELECT t.geohash, t.owner_id, t.captured_run_id, t.captured_at, t.center_lat, t.center_lng, u.username as owner_username
      FROM territories t
      JOIN users u ON t.owner_id = u.id
      WHERE t.geohash = ANY($1)`,
     [queryHashes]
   );
+  
+  const territories = rows as Territory[];
+  
+  // 3. Fetch unique path polygons for the captured_run_ids in the viewport
+  const runIds = [...new Set(territories.map(t => t.captured_run_id).filter(Boolean))];
+  const runPolygons: Record<string, { lat: number, lng: number }[]> = {};
+  
+  if (runIds.length > 0) {
+    const { rows: runRows } = await pool.query(
+      `SELECT id, path_polygon FROM runs WHERE id = ANY($1) AND path_polygon IS NOT NULL`,
+      [runIds]
+    );
+    for (const r of runRows) {
+      runPolygons[r.id] = r.path_polygon;
+    }
+  }
 
-  return rows as Territory[];
+  return { territories, runPolygons };
 }
 
 export async function getTerritoryByGeohash(geohash: string): Promise<Territory | null> {

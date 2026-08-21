@@ -1,5 +1,5 @@
 import { pool, withTransaction } from '../../config/db';
-import { calculateTotalDistance, calculatePace } from '../../utils/geo';
+import { calculateTotalDistance, calculatePace, autoClosePath, polygonArea, getPolygonBoundingBox, isPointInPolygon } from '../../utils/geo';
 
 export interface RunPointInput {
   lat: number;
@@ -27,7 +27,7 @@ export interface RunPoint {
   recorded_at: Date;
 }
 
-import { encodeGeohash, decodeGeohash } from '../territories/geohash';
+import { decodeGeohash, getGeohashesInBbox } from '../territories/geohash';
 import { updateScores } from '../leaderboards/leaderboards.service';
 
 export async function createRun(
@@ -35,7 +35,7 @@ export async function createRun(
   clientRunId: string,
   startedAt: string,
   points: RunPointInput[]
-): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[] }> {
+): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[]; enclosedAreaSquareMeters: number }> {
   // Sort points by recordedAt just in case they arrived out of order
   const sortedPoints = [...points].sort(
     (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
@@ -50,18 +50,44 @@ export async function createRun(
   
   const avgPace = calculatePace(distanceMeters, durationSeconds);
 
-  // Calculate unique territories touched by this run
-  const uniqueHashes = extractAndSortUniqueTerritories(sortedPoints);
+  const closedPoints = autoClosePath(sortedPoints, 30);
+  const enclosedAreaSquareMeters = polygonArea(closedPoints);
+  
+  if (enclosedAreaSquareMeters > 5000000) {
+    const error = new Error('Enclosed area exceeds maximum allowed (5 sq km)');
+    (error as any).statusCode = 422;
+    (error as any).code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  let uniqueHashes: string[] = [];
+  if (closedPoints.length >= 4 && enclosedAreaSquareMeters >= 200) {
+    const bbox = getPolygonBoundingBox(closedPoints);
+    const candidateHashes = getGeohashesInBbox(bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng);
+    
+    const insideHashes: string[] = [];
+    for (const hash of candidateHashes) {
+      const center = decodeGeohash(hash);
+      if (isPointInPolygon(center, closedPoints)) {
+        insideHashes.push(hash);
+      }
+    }
+    
+    // Sort lexicographically to prevent deadlocks!
+    insideHashes.sort();
+    uniqueHashes = insideHashes;
+  }
 
   const result = await withTransaction(async (client) => {
     // 1. Try to insert the run. 
     // Uses ON CONFLICT DO NOTHING to handle idempotency via the UNIQUE(user_id, client_run_id) constraint.
+    const pathPolygonJson = JSON.stringify(closedPoints);
     const { rows: runRows } = await client.query(
-      `INSERT INTO runs (user_id, client_run_id, distance_meters, duration_seconds, avg_pace_sec_per_km, started_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO runs (user_id, client_run_id, distance_meters, duration_seconds, avg_pace_sec_per_km, started_at, path_polygon)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (user_id, client_run_id) DO NOTHING
        RETURNING *`,
-      [userId, clientRunId, distanceMeters, durationSeconds, avgPace, startedAt]
+      [userId, clientRunId, distanceMeters, durationSeconds, avgPace, startedAt, pathPolygonJson]
     );
 
     // 2. If no row was returned, it means the run already exists!
@@ -72,7 +98,7 @@ export async function createRun(
         [userId, clientRunId]
       );
       // Return empty capturedTerritories since this is a replay of an existing successful run
-      return { run: existingRows[0] as Run, capturedTerritories: [] };
+      return { run: existingRows[0] as Run, capturedTerritories: [], enclosedAreaSquareMeters };
     }
 
     const run = runRows[0] as Run;
@@ -102,8 +128,8 @@ export async function createRun(
 
       // 1. Ensure the row exists idempotently to avoid UPSERT race conditions
       await client.query(`
-        INSERT INTO territories (geohash, owner_id, captured_at, center_lat, center_lng)
-        VALUES ($1, NULL, NOW(), $2, $3)
+        INSERT INTO territories (geohash, owner_id, captured_at, center_lat, center_lng, captured_run_id)
+        VALUES ($1, NULL, NOW(), $2, $3, NULL)
         ON CONFLICT (geohash) DO NOTHING
       `, [hash, lat, lng]);
 
@@ -116,7 +142,7 @@ export async function createRun(
         ),
         updated AS (
           UPDATE territories
-          SET owner_id = $2, captured_at = NOW()
+          SET owner_id = $2, captured_at = NOW(), captured_run_id = $3
           WHERE geohash = $1 AND (owner_id != $2 OR owner_id IS NULL)
           RETURNING id
         )
@@ -124,7 +150,7 @@ export async function createRun(
           o.territory_id,
           o.previous_owner_id
         FROM old_terr o
-      `, [hash, userId]);
+      `, [hash, userId, run.id]);
 
       const previousOwnerId = res.rows[0]?.previous_owner_id || null;
       const territoryId = res.rows[0].territory_id;
@@ -160,7 +186,7 @@ export async function createRun(
       }
     }
 
-    return { run, capturedTerritories };
+    return { run, capturedTerritories, enclosedAreaSquareMeters };
   });
 
   // Post-commit: Sync scores to Redis. 
@@ -252,17 +278,4 @@ export async function getRunById(
   };
 }
 
-/**
- * Pure function: Given an array of GPS points, computes the unique
- * geohash cells they intersect and sorts them lexicographically.
- * Sorting is crucial to enforce deterministic lock ordering and prevent deadlocks.
- */
-export function extractAndSortUniqueTerritories(points: { lat: number; lng: number }[]): string[] {
-  const uniqueHashesSet = new Set<string>();
-  for (const pt of points) {
-    uniqueHashesSet.add(encodeGeohash(pt.lat, pt.lng));
-  }
-  const uniqueHashes = Array.from(uniqueHashesSet);
-  uniqueHashes.sort();
-  return uniqueHashes;
-}
+// extractAndSortUniqueTerritories was removed in Phase 16 in favor of polygon captures

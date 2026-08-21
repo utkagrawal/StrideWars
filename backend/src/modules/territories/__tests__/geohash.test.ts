@@ -1,4 +1,4 @@
-import { encodeGeohash, decodeGeohash, getGeohashNeighbors, getBboxForGeohash } from '../geohash';
+import { encodeGeohash, decodeGeohash, getGeohashesInBbox } from '../geohash';
 
 describe('Geohash Utilities', () => {
   describe('encodeGeohash / decodeGeohash', () => {
@@ -17,29 +17,12 @@ describe('Geohash Utilities', () => {
     });
   });
 
-  describe('getGeohashNeighbors', () => {
-    it('returns an array of 8 neighbors', () => {
-      const neighbors = getGeohashNeighbors('9q8yyk8');
-      expect(neighbors).toBeInstanceOf(Array);
-      expect(neighbors.length).toBe(8);
-      
-      // Ensure all neighbors have the same precision
-      neighbors.forEach(n => {
-        expect(n.length).toBe(7);
-      });
-    });
-  });
-
-  describe('getBboxForGeohash', () => {
-    it('returns a valid bounding box', () => {
-      const bbox = getBboxForGeohash('9q8yyk8');
-      expect(bbox).toHaveProperty('minLat');
-      expect(bbox).toHaveProperty('minLng');
-      expect(bbox).toHaveProperty('maxLat');
-      expect(bbox).toHaveProperty('maxLng');
-      
-      expect(bbox.minLat).toBeLessThan(bbox.maxLat);
-      expect(bbox.minLng).toBeLessThan(bbox.maxLng);
+  describe('getGeohashesInBbox', () => {
+    it('returns an array of geohashes', () => {
+      const hashes = getGeohashesInBbox(37.7, -122.5, 37.8, -122.4);
+      expect(hashes).toBeInstanceOf(Array);
+      expect(hashes.length).toBeGreaterThan(0);
+      expect(hashes[0].length).toBe(7);
     });
   });
 });

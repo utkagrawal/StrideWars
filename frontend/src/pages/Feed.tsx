@@ -35,7 +35,7 @@ export const Feed = () => {
       
       {items.length === 0 && !loading && (
         <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '2rem' }}>
-          No activity found. Try following some users!
+          The map is quiet right now. Follow some runners to see who's taking ground.
         </div>
       )}
 
@@ -49,9 +49,9 @@ export const Feed = () => {
                 </a>
               </div>
               {item.type === 'run' ? (
-                <div>Completed a run of {item.distanceMeters}m in {item.durationSeconds}s</div>
+                <div>Completed a loop covering {item.distanceMeters}m in {item.durationSeconds}s</div>
               ) : (
-                <div>Captured territory <span style={{ fontFamily: 'monospace', color: 'var(--color-brand-primary)' }}>{item.geohash}</span></div>
+                <div>Claimed ground: <span style={{ fontFamily: 'monospace', color: 'var(--color-brand-primary)' }}>{item.geohash}</span></div>
               )}
             </div>
             <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>

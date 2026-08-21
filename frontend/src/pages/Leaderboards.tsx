@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { getGlobalLeaderboard, getUserGlobalRank, getRegionalLeaderboard, LeaderboardEntry } from '../api/leaderboards';
 import { useAuth } from '../hooks/useAuth';
+import { formatArea } from '../utils/format';
 
 export const Leaderboards = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'global' | 'regional'>('global');
   const [globalEntries, setGlobalEntries] = useState<LeaderboardEntry[]>([]);
   const [regionalEntries, setRegionalEntries] = useState<LeaderboardEntry[]>([]);
-  const [userRank, setUserRank] = useState<{ rank: number | null; territoryCount: number } | null>(null);
+  const [userRank, setUserRank] = useState<{ rank: number | null; areaSquareMeters: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [regionName, setRegionName] = useState<string | null>(null);
 
   // SF prefix for demo
   const DEMO_PREFIX = '9q8';
@@ -30,8 +32,32 @@ export const Leaderboards = () => {
         setGlobalEntries(globalData.entries);
         setUserRank(rankData);
       } else {
-        const regionalData = await getRegionalLeaderboard(DEMO_PREFIX, 50);
+        let lat: number | undefined;
+        let lng: number | undefined;
+
+        if (navigator.geolocation) {
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+            });
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+          } catch (e) {
+            console.warn('Geolocation failed for leaderboard:', e);
+          }
+        }
+
+        const params: any = { limit: 50 };
+        if (lat !== undefined && lng !== undefined) {
+          params.lat = lat;
+          params.lng = lng;
+        } else {
+          params.geohashPrefix = DEMO_PREFIX;
+        }
+
+        const regionalData = await getRegionalLeaderboard(params);
         setRegionalEntries(regionalData.entries);
+        setRegionName(regionalData.regionName || (lat === undefined ? 'Unavailable' : 'Unknown Region'));
       }
     } catch (err) {
       setError('Failed to fetch leaderboard data');
@@ -46,7 +72,7 @@ export const Leaderboards = () => {
         <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
           <th style={{ textAlign: 'left', padding: '0.5rem' }}>Rank</th>
           <th style={{ textAlign: 'left', padding: '0.5rem' }}>Player</th>
-          <th style={{ textAlign: 'right', padding: '0.5rem' }}>Territories</th>
+          <th style={{ textAlign: 'right', padding: '0.5rem' }}>Area Claimed</th>
         </tr>
       </thead>
       <tbody>
@@ -66,19 +92,27 @@ export const Leaderboards = () => {
               </a>
               {entry.userId === user?.id && <span style={{ marginLeft: '0.5rem', color: 'var(--color-brand-primary)' }}>(You)</span>}
             </td>
-            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>{entry.territoryCount}</td>
+            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>{formatArea(entry.areaSquareMeters)}</td>
           </tr>
         ))}
         {entries.length === 0 && (
           <tr>
             <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
-              No territories captured yet. Go run!
+              No ground claimed yet. Claim your first piece of the map today!
             </td>
           </tr>
         )}
       </tbody>
     </table>
   );
+
+  let targetDelta = null;
+  if (userRank && userRank.rank && userRank.rank > 1) {
+    const target = globalEntries.find(e => e.rank === userRank.rank! - 1);
+    if (target) {
+      targetDelta = { rank: target.rank, diff: target.areaSquareMeters - userRank.areaSquareMeters };
+    }
+  }
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -95,7 +129,7 @@ export const Leaderboards = () => {
           onClick={() => setActiveTab('regional')}
           style={{ background: activeTab === 'regional' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)' }}
         >
-          Regional (San Francisco)
+          Regional {regionName ? `(${regionName})` : ''}
         </button>
       </div>
 
@@ -108,11 +142,16 @@ export const Leaderboards = () => {
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
               {userRank.rank ? `#${userRank.rank}` : 'Unranked'}
             </div>
+            {targetDelta && (
+              <div style={{ fontSize: '0.85rem', color: 'var(--color-brand-primary)', marginTop: '0.25rem' }}>
+                Only {formatArea(targetDelta.diff)} to catch #{targetDelta.rank}!
+              </div>
+            )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Territories</h3>
+            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Your Ground</h3>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-              {userRank.territoryCount}
+              {formatArea(userRank.areaSquareMeters)}
             </div>
           </div>
         </div>

@@ -41,8 +41,8 @@ export const Notifications = () => {
     if (type === 'territory_lost') {
       return (
         <div>
-          <strong>Territory Lost!</strong><br />
-          {payload.message}
+          <strong style={{ color: '#ef4444' }}>Ground Lost!</strong><br />
+          {payload.message.replace('Someone', 'A rival').replace('captured', 'took').replace('territories', 'cells')} — get out there and reclaim them.
         </div>
       );
     }
@@ -51,12 +51,12 @@ export const Notifications = () => {
 
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <h2 style={{ marginBottom: '2rem' }}>Notifications</h2>
+      <h2 style={{ marginBottom: '2rem' }}>Alerts</h2>
       {error && <div className="error-message">{error}</div>}
       
       {items.length === 0 && !loading && (
         <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '2rem' }}>
-          No notifications yet.
+          Your territory is secure. No alerts right now.
         </div>
       )}
 

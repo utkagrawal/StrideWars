@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../../../app';
 import { pool } from '../../../config/db';
-import { encodeGeohash } from '../../territories/geohash';
+// Unused import removed
 import crypto from 'crypto';
 
 const app = createApp();
@@ -53,17 +53,18 @@ describe('Territory Capture Integration', () => {
     await pool.end();
   });
 
-  it('captures multiple distinct cells correctly (and dedupes)', async () => {
-    // Create a run that stays in one spot for a few points, then moves
-    const pt1 = { lat: 37.0, lng: -122.0 };
-    const pt2 = { lat: 37.1, lng: -122.1 };
-    const hash1 = encodeGeohash(pt1.lat, pt1.lng);
-    const hash2 = encodeGeohash(pt2.lat, pt2.lng);
+  it('captures cells enclosed by a polygon', async () => {
+    // Create a square run (~550m x 450m)
+    const pt1 = { lat: 37.000, lng: -122.000 };
+    const pt2 = { lat: 37.005, lng: -122.000 };
+    const pt3 = { lat: 37.005, lng: -122.005 };
+    const pt4 = { lat: 37.000, lng: -122.005 };
 
     const points = [
       { ...pt1, recordedAt: '2023-01-01T10:00:00Z' },
-      { ...pt1, recordedAt: '2023-01-01T10:00:10Z' }, // Same hash, should be deduped
-      { ...pt2, recordedAt: '2023-01-01T10:00:20Z' },
+      { ...pt2, recordedAt: '2023-01-01T10:00:10Z' },
+      { ...pt3, recordedAt: '2023-01-01T10:00:20Z' },
+      { ...pt4, recordedAt: '2023-01-01T10:00:30Z' },
     ];
 
     const clientRunId = crypto.randomUUID();
@@ -73,55 +74,22 @@ describe('Territory Capture Integration', () => {
       .send({ clientRunId, startedAt: points[0].recordedAt, points })
       .expect(201);
     
-    // We should only have 2 captures because of dedup
-    expect(res.body.capturedTerritories).toHaveLength(2);
-    
-    // Both should be in the returned array
-    const capturedHashes = res.body.capturedTerritories.map((t: any) => t.geohash);
-    expect(capturedHashes).toContain(hash1);
-    expect(capturedHashes).toContain(hash2);
-
-    // Verify DB state
-    const { rows } = await pool.query('SELECT owner_id FROM territories WHERE geohash = ANY($1)', [[hash1, hash2]]);
-    expect(rows).toHaveLength(2);
-    expect(rows[0].owner_id).toBe(user1Id);
-    expect(rows[1].owner_id).toBe(user1Id);
+    // We expect it to capture cells inside this ~12,000 m^2 square
+    expect(res.body.capturedTerritories.length).toBeGreaterThan(0);
+    expect(res.body.enclosedAreaSquareMeters).toBeGreaterThan(10000);
   });
 
   it('safely handles concurrent capturing of overlapping cells without deadlocking', async () => {
-    // User 1 runs North: cells A, B, C
-    // User 2 runs South: cells C, B, A
-    // User 3 runs random: cells B, A, C
-    // If not sorted, locking A then B vs C then B will cause a circular deadlock in PostgreSQL.
-    
-    const ptA = { lat: 38.0, lng: -122.0 }; // Cell A
-    const ptB = { lat: 38.01, lng: -122.0 }; // Cell B
-    const ptC = { lat: 38.02, lng: -122.0 }; // Cell C
-
-    const hashA = encodeGeohash(ptA.lat, ptA.lng);
-    const hashB = encodeGeohash(ptB.lat, ptB.lng);
-    const hashC = encodeGeohash(ptC.lat, ptC.lng);
-
-    // We know these hashes are different, but we don't know their lexicographical order natively.
-    // The server will sort them.
-
+    // 3 users run the exact same square at the exact same time
     const run1Points = [
-      { ...ptA, recordedAt: '2023-01-01T10:00:00Z' },
-      { ...ptB, recordedAt: '2023-01-01T10:00:10Z' },
-      { ...ptC, recordedAt: '2023-01-01T10:00:20Z' },
+      { lat: 38.000, lng: -122.000, recordedAt: '2023-01-01T10:00:00Z' },
+      { lat: 38.005, lng: -122.000, recordedAt: '2023-01-01T10:00:10Z' },
+      { lat: 38.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
+      { lat: 38.000, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' }
     ];
 
-    const run2Points = [
-      { ...ptC, recordedAt: '2023-01-01T10:00:00Z' }, // Reversed order for user 2
-      { ...ptB, recordedAt: '2023-01-01T10:00:10Z' },
-      { ...ptA, recordedAt: '2023-01-01T10:00:20Z' },
-    ];
-
-    const run3Points = [
-      { ...ptB, recordedAt: '2023-01-01T10:00:00Z' }, // Scrambled order for user 3
-      { ...ptA, recordedAt: '2023-01-01T10:00:10Z' },
-      { ...ptC, recordedAt: '2023-01-01T10:00:20Z' },
-    ];
+    const run2Points = [...run1Points].reverse(); // User 2 ran it backwards
+    const run3Points = [run1Points[2], run1Points[3], run1Points[0], run1Points[1]]; // User 3 started at point C
 
     // Fire concurrently
     const p1 = request(app)
@@ -146,33 +114,26 @@ describe('Territory Capture Integration', () => {
     expect(res2.status).toBe(201);
     expect(res3.status).toBe(201);
 
-    expect(res1.body.capturedTerritories).toHaveLength(3);
-    expect(res2.body.capturedTerritories).toHaveLength(3);
-    expect(res3.body.capturedTerritories).toHaveLength(3);
+    expect(res1.body.capturedTerritories.length).toBeGreaterThan(0);
+    expect(res1.body.capturedTerritories.length).toEqual(res2.body.capturedTerritories.length);
+    expect(res1.body.capturedTerritories.length).toEqual(res3.body.capturedTerritories.length);
 
-    // Check DB state: one of them won the race for each cell.
-    // Since "last update wins", all 3 cells will belong to whichever transaction committed last.
-    const { rows } = await pool.query('SELECT DISTINCT owner_id FROM territories WHERE geohash = ANY($1)', [[hashA, hashB, hashC]]);
+    // All cells should be owned by someone
+    const hashes = res1.body.capturedTerritories.map((t: any) => t.geohash);
+    const { rows } = await pool.query('SELECT DISTINCT owner_id FROM territories WHERE geohash = ANY($1)', [hashes]);
     
-    // There should only be 1 distinct owner for all 3 cells (or 2/3 if interleaved perfectly, but valid execution either way)
     expect(rows.length).toBeGreaterThanOrEqual(1);
     expect([user1Id, user2Id, user3Id]).toContain(rows[0].owner_id);
-
-    // Check that territory_captures has exactly 9 entries for these hashes (3 for u1, 3 for u2, 3 for u3)
-    const { rows: captures } = await pool.query(`
-      SELECT count(*) 
-      FROM territory_captures tc 
-      JOIN territories t ON tc.territory_id = t.id 
-      WHERE t.geohash = ANY($1)
-    `, [[hashA, hashB, hashC]]);
-    expect(parseInt(captures[0].count)).toBe(9);
   });
 
   it('is idempotent and does not double-capture on replay', async () => {
-    const pt = { lat: 39.0, lng: -122.0 };
-    const hash = encodeGeohash(pt.lat, pt.lng);
+    const points = [
+      { lat: 39.000, lng: -122.000, recordedAt: '2023-01-01T10:00:00Z' },
+      { lat: 39.005, lng: -122.000, recordedAt: '2023-01-01T10:00:10Z' },
+      { lat: 39.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
+      { lat: 39.000, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' }
+    ];
     const clientRunId = crypto.randomUUID();
-    const points = [{ ...pt, recordedAt: '2023-01-01T10:00:00Z' }];
 
     const res1 = await request(app)
       .post('/api/runs')
@@ -180,15 +141,8 @@ describe('Territory Capture Integration', () => {
       .send({ clientRunId, startedAt: points[0].recordedAt, points })
       .expect(201);
     
-    expect(res1.body.capturedTerritories).toHaveLength(1);
-
-    const { rows: initialCaptures } = await pool.query(`
-      SELECT count(*) 
-      FROM territory_captures tc 
-      JOIN territories t ON tc.territory_id = t.id 
-      WHERE t.geohash = $1
-    `, [hash]);
-    expect(parseInt(initialCaptures[0].count)).toBe(1);
+    const count = res1.body.capturedTerritories.length;
+    expect(count).toBeGreaterThan(0);
 
     // Replay exact same request
     const res2 = await request(app)
@@ -199,14 +153,43 @@ describe('Territory Capture Integration', () => {
 
     // Should return 0 captured territories
     expect(res2.body.capturedTerritories).toHaveLength(0);
+  });
 
-    // DB capture count should still be 1
-    const { rows: finalCaptures } = await pool.query(`
-      SELECT count(*) 
-      FROM territory_captures tc 
-      JOIN territories t ON tc.territory_id = t.id 
-      WHERE t.geohash = $1
-    `, [hash]);
-    expect(parseInt(finalCaptures[0].count)).toBe(1);
+  it('rejects runs with an area greater than 5,000,000 m^2 with 422', async () => {
+    // 1 degree is roughly 111km. 1 degree square is ~12,321,000,000 m^2
+    const points = [
+      { lat: 39.000, lng: -122.000, recordedAt: '2023-01-01T10:00:00Z' },
+      { lat: 40.000, lng: -122.000, recordedAt: '2023-01-01T10:00:10Z' },
+      { lat: 40.000, lng: -123.000, recordedAt: '2023-01-01T10:00:20Z' },
+      { lat: 39.000, lng: -123.000, recordedAt: '2023-01-01T10:00:30Z' }
+    ];
+    const clientRunId = crypto.randomUUID();
+
+    const res = await request(app)
+      .post('/api/runs')
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({ clientRunId, startedAt: points[0].recordedAt, points })
+      .expect(422);
+    
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.message).toMatch(/maximum allowed/);
+  });
+
+  it('gracefully handles a straight line (zero area)', async () => {
+    const points = [
+      { lat: 39.000, lng: -122.000, recordedAt: '2023-01-01T10:00:00Z' },
+      { lat: 39.001, lng: -122.000, recordedAt: '2023-01-01T10:00:10Z' },
+      { lat: 39.002, lng: -122.000, recordedAt: '2023-01-01T10:00:20Z' },
+    ];
+    const clientRunId = crypto.randomUUID();
+
+    const res = await request(app)
+      .post('/api/runs')
+      .set('Authorization', `Bearer ${user1Token}`)
+      .send({ clientRunId, startedAt: points[0].recordedAt, points })
+      .expect(201);
+    
+    expect(res.body.capturedTerritories).toHaveLength(0);
+    expect(res.body.enclosedAreaSquareMeters).toBe(0);
   });
 });

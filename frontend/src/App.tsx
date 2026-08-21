@@ -14,6 +14,7 @@ import { Leaderboards } from './pages/Leaderboards';
 import { Feed } from './pages/Feed';
 import { Notifications } from './pages/Notifications';
 import HomePage from './pages/HomePage';
+import { Landing } from './pages/Landing';
 import { getUnreadCount } from './api/notifications';
 
 const NotificationBell = () => {
@@ -58,6 +59,12 @@ const NotificationBell = () => {
   );
 };
 
+const RootRoute = () => {
+  const { user, loading } = useAuth();
+  if (loading) return <div>Loading...</div>;
+  return user ? <TerritoriesMap /> : <Landing />;
+};
+
 const AppShell = () => {
   const { user } = useAuth();
 
@@ -70,7 +77,8 @@ const AppShell = () => {
         {user ? (
           <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', fontWeight: 500 }}>
             <Link to="/feed" style={{ color: 'white', textDecoration: 'none' }}>Feed</Link>
-            <Link to="/territories" style={{ color: 'white', textDecoration: 'none' }}>Map</Link>
+            <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>Map</Link>
+            <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>Dashboard</Link>
             <Link to="/runs" style={{ color: 'white', textDecoration: 'none' }}>Runs</Link>
             <Link to="/runs/new" style={{ color: 'var(--color-brand-primary)', textDecoration: 'none' }}>+ Record</Link>
             <Link to="/leaderboards" style={{ color: 'white', textDecoration: 'none' }}>Rankings</Link>
@@ -86,16 +94,16 @@ const AppShell = () => {
       </header>
       <main className="app-main">
         <Routes>
+          <Route path="/" element={<RootRoute />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/dashboard" element={<HomePage />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:id" element={<Profile />} />
             <Route path="/runs" element={<RunHistory />} />
             <Route path="/runs/new" element={<RecordRun />} />
             <Route path="/runs/:id" element={<RunDetail />} />
-            <Route path="/territories" element={<TerritoriesMap />} />
             <Route path="/leaderboards" element={<Leaderboards />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/notifications" element={<Notifications />} />

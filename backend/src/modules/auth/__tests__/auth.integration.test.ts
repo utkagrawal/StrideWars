@@ -15,7 +15,7 @@ describe('Auth Integration', () => {
 
   const testUser = {
     username: 'testauthuser',
-    email: 'auth@test.com',
+    email: 'auth2@test.com',
     password: 'password123',
   };
 

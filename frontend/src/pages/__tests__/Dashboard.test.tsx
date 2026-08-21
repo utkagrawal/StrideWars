@@ -48,7 +48,7 @@ describe('Dashboard (HomePage)', () => {
   });
 
   it('renders dashboard data when fetch is successful', async () => {
-    (runsApi.getRuns as Mock).mockResolvedValue({ runs: [{ id: '1', distanceMeters: 5000, durationSeconds: 1500, startedAt: new Date().toISOString() }, { id: '2', distanceMeters: 3000, durationSeconds: 900, startedAt: new Date().toISOString() }] });
+    (runsApi.getRuns as Mock).mockResolvedValue({ runs: [{ id: '1', distance_meters: 5000, duration_seconds: 1500, started_at: new Date().toISOString() }, { id: '2', distance_meters: 3000, duration_seconds: 900, started_at: new Date().toISOString() }] });
     (territoriesApi.getMyTerritories as Mock).mockResolvedValue([{ geohash: '9q8yyk' }]);
     (leaderboardsApi.getUserGlobalRank as Mock).mockResolvedValue({ rank: 42 });
     (notificationsApi.getUnreadCount as Mock).mockResolvedValue({ count: 3 });
@@ -77,6 +77,24 @@ describe('Dashboard (HomePage)', () => {
       expect(screen.getByText('Unranked')).toBeInTheDocument();
     });
 
-    expect(screen.getByText("You haven't recorded any runs yet.")).toBeInTheDocument();
+    expect(screen.getByText("You haven't claimed any ground yet.")).toBeInTheDocument();
+    expect(screen.getByText('Claim Ground')).toBeInTheDocument();
+  });
+
+  it('ensures recording UI controls are entirely absent from the dashboard', async () => {
+    (runsApi.getRuns as Mock).mockResolvedValue({ runs: [] });
+    (territoriesApi.getMyTerritories as Mock).mockResolvedValue([]);
+    (leaderboardsApi.getUserGlobalRank as Mock).mockResolvedValue({ rank: null });
+    (notificationsApi.getUnreadCount as Mock).mockResolvedValue({ count: 0 });
+
+    renderWithProviders(<HomePage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading Dashboard.../i)).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Start Run')).not.toBeInTheDocument();
+    expect(screen.queryByText('Generate Random Point')).not.toBeInTheDocument();
+    expect(screen.queryByText('Finish Run')).not.toBeInTheDocument();
   });
 });

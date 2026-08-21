@@ -38,3 +38,6 @@ The modular monolith is designed to be split into microservices only if necessar
    - Migrate background tasks from the `jobs` Postgres table to Redis-backed BullMQ using the Transactional Outbox pattern.
 5. **Sharding by Region**
    - Horizontally shard the `territories` and `runs` tables by geohash prefixes (e.g., NA runs on DB1, EU runs on DB2).
+6. **Batch Run-Upload Architecture (Resilience Upgrade)**
+   - *Current State*: The frontend buffers all recorded GPS points in memory and submits them as a single monolithic payload on "Finish Run".
+   - *Future Upgrade*: For very long runs (e.g. marathons) where the browser might crash or lose context, the frontend should periodically flush buffered points to a lightweight, ephemeral `POST /api/runs/live-sync` endpoint (e.g. every 10-15 seconds). These partial syncs would not trigger territory captures or lock contention; they would simply append to the `run_points` table. "Finish Run" would then just signal the final closure and trigger the Phase 16 territory capture logic on the accumulated points. *Note: This is explicitly documented here as a future resilience upgrade and is not required for the current prototype Phase.*

@@ -112,19 +112,29 @@ describe('Social Integration', () => {
     // We need some activity from user 2 and user 3
     
     // User 2 runs
-    const pt2 = { lat: 38.0, lng: -122.0, recordedAt: new Date(Date.now() - 10000).toISOString() };
+    const points2 = [
+      { lat: 38.000, lng: -122.000, recordedAt: new Date(Date.now() - 13000).toISOString() },
+      { lat: 38.005, lng: -122.000, recordedAt: new Date(Date.now() - 12000).toISOString() },
+      { lat: 38.005, lng: -122.005, recordedAt: new Date(Date.now() - 11000).toISOString() },
+      { lat: 38.000, lng: -122.005, recordedAt: new Date(Date.now() - 10000).toISOString() }
+    ];
     await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u2Token}`)
-      .send({ clientRunId: crypto.randomUUID(), startedAt: pt2.recordedAt, points: [pt2] })
+      .send({ clientRunId: crypto.randomUUID(), startedAt: points2[0].recordedAt, points: points2 })
       .expect(201);
       
     // User 3 runs
-    const pt3 = { lat: 39.0, lng: -122.0, recordedAt: new Date(Date.now() - 5000).toISOString() };
+    const points3 = [
+      { lat: 39.000, lng: -122.000, recordedAt: new Date(Date.now() - 8000).toISOString() },
+      { lat: 39.005, lng: -122.000, recordedAt: new Date(Date.now() - 7000).toISOString() },
+      { lat: 39.005, lng: -122.005, recordedAt: new Date(Date.now() - 6000).toISOString() },
+      { lat: 39.000, lng: -122.005, recordedAt: new Date(Date.now() - 5000).toISOString() }
+    ];
     await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u3Token}`)
-      .send({ clientRunId: crypto.randomUUID(), startedAt: pt3.recordedAt, points: [pt3] })
+      .send({ clientRunId: crypto.randomUUID(), startedAt: points3[0].recordedAt, points: points3 })
       .expect(201);
 
     // User 1 fetches feed

@@ -43,6 +43,19 @@ router.get(
   asyncHandler(getRuns)
 );
 
+import { generateLoop } from './runs.controller';
+
+router.get(
+  '/generate-loop',
+  requireAuth,
+  [
+    query('lat').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude required'),
+    query('lng').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude required'),
+  ],
+  validate,
+  asyncHandler(generateLoop)
+);
+
 router.get(
   '/:id',
   requireAuth,

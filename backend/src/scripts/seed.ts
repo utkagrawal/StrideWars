@@ -2,6 +2,8 @@ import { pool } from '../config/db';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import geohash from 'ngeohash';
+import { createRun } from '../modules/runs/runs.service';
+import { generateRoadLoop } from '../utils/geo';
 
 const NUM_USERS = 5000;
 const RUNS_PER_USER = 10;
@@ -215,7 +217,45 @@ async function seed() {
     console.log('✅ Territory captures inserted.');
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`🎉 Seeding complete in ${duration}s.`);
+    console.log(`🎉 Bulk seeding complete in ${duration}s.`);
+    
+    // 6. Generate IIT Guwahati demo users & runs
+    console.log('Generating IIT Guwahati demo users and runs...');
+    const demoCenter = { lat: 26.1878, lng: 91.6916 }; // IIT Guwahati
+    
+    // Spread them out slightly
+    const offsets = [
+      { dLat: 0.002, dLng: 0.002 },
+      { dLat: -0.002, dLng: 0.002 },
+      { dLat: 0.002, dLng: -0.002 },
+      { dLat: -0.002, dLng: -0.002 },
+      { dLat: 0, dLng: 0.003 }
+    ];
+    
+    for (let i = 0; i < 5; i++) {
+      const demoUserId = crypto.randomUUID();
+      const demoUsername = `iitg_demo_${i+1}`;
+      
+      await pool.query(`
+        INSERT INTO users (id, username, email, password_hash, display_name)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [demoUserId, demoUsername, `${demoUsername}@test.com`, passwordHash, `Demo User ${i+1}`]);
+      
+      const centerLat = demoCenter.lat + offsets[i].dLat;
+      const centerLng = demoCenter.lng + offsets[i].dLng;
+      
+      // Generate loop and run it through the real capture pipeline
+      const points = await generateRoadLoop(centerLat, centerLng, 300, 800);
+      const clientRunId = crypto.randomUUID();
+      const startedAt = points[0].recordedAt;
+      
+      await createRun(demoUserId, clientRunId, startedAt, points);
+    }
+    console.log('✅ IIT Guwahati demo data created.');
+    
+    // 7. Rebuild Leaderboards to fix raw count scores for bulk-seeded users
+    const { rebuildLeaderboards } = await import('../modules/leaderboards/leaderboards.service');
+    await rebuildLeaderboards();
     
   } catch (err) {
     console.error('Error seeding database:', err);

@@ -67,9 +67,9 @@ export default function HomePage() {
         </div>
 
         <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
-          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Territories Owned</h3>
+          <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Your Ground</h3>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>{territoryCount}</div>
-          <Link to="/territories" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View Map →</Link>
+          <Link to="/" style={{ color: 'var(--color-brand-primary)', fontSize: '0.85rem' }}>View Map →</Link>
         </div>
 
         <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: '8px' }}>
@@ -89,9 +89,9 @@ export default function HomePage() {
         <h3>Recent Activity</h3>
         {runs.length === 0 ? (
           <div style={{ background: 'var(--color-bg-surface)', padding: '2rem', textAlign: 'center', borderRadius: '8px', marginTop: '1rem' }}>
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>You haven't recorded any runs yet.</p>
-            <Link to="/runs/new" style={{ padding: '0.5rem 1rem', background: 'var(--color-brand-primary)', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
-              Record First Run
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>You haven't claimed any ground yet.</p>
+            <Link to="/" style={{ padding: '0.5rem 1rem', background: 'var(--color-brand-primary)', color: '#000', fontWeight: 'bold', textDecoration: 'none', borderRadius: '4px' }}>
+              Claim Ground
             </Link>
           </div>
         ) : (

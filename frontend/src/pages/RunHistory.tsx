@@ -63,7 +63,7 @@ export const RunHistory = () => {
           </Link>
         ))}
         
-        {!loading && runs.length === 0 && <p style={{ color: 'var(--color-text-secondary)' }}>No runs found. Go record one!</p>}
+        {!loading && runs.length === 0 && <p style={{ color: 'var(--color-text-secondary)' }}>You haven't run any loops yet. Claim your first piece of the map today.</p>}
       </div>
 
       {nextCursor && (

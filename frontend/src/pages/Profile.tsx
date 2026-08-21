@@ -126,6 +126,11 @@ export const Profile = () => {
             <div style={{ color: 'var(--color-text-secondary)' }}>Following</div>
           </div>
         </div>
+        {followersCount === 0 && (
+          <p style={{ color: 'var(--color-text-secondary)', marginTop: '1rem', fontSize: '0.9rem' }}>
+            No followers yet. Start capturing ground to get noticed!
+          </p>
+        )}
       </div>
 
       {isOwnProfile && (

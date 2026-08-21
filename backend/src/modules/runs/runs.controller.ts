@@ -6,9 +6,9 @@ export async function createRun(req: Request, res: Response, next: NextFunction)
     const userId = req.user!.userId;
     const { clientRunId, startedAt, points } = req.body;
 
-    const { run, capturedTerritories } = await runsService.createRun(userId, clientRunId, startedAt, points);
+    const { run, capturedTerritories, enclosedAreaSquareMeters } = await runsService.createRun(userId, clientRunId, startedAt, points);
     
-    return res.status(201).json({ run, capturedTerritories });
+    return res.status(201).json({ run, capturedTerritories, enclosedAreaSquareMeters });
   } catch (err) {
     return next(err);
   }
@@ -43,6 +43,20 @@ export async function getRun(req: Request, res: Response, next: NextFunction): P
     }
 
     return res.status(200).json(result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+import { generateRoadLoop } from '../../utils/geo';
+
+export async function generateLoop(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    const points = await generateRoadLoop(lat, lng, 300, 800);
+    return res.status(200).json({ points });
   } catch (err) {
     return next(err);
   }

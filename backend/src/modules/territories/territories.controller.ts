@@ -6,9 +6,9 @@ export async function getTerritories(req: Request, res: Response, next: NextFunc
     const bboxStr = req.query.bbox as string;
     const [minLat, minLng, maxLat, maxLng] = bboxStr.split(',').map(parseFloat);
 
-    const territories = await territoriesService.getTerritoriesInBbox(minLat, minLng, maxLat, maxLng);
+    const result = await territoriesService.getTerritoriesInBbox(minLat, minLng, maxLat, maxLng);
     
-    return res.status(200).json({ territories });
+    return res.status(200).json(result);
   } catch (err) {
     return next(err);
   }
