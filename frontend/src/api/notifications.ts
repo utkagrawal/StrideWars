@@ -9,7 +9,10 @@ export interface NotificationItem {
   createdAt: string;
 }
 
-export const getNotifications = async (cursor?: string, limit: number = 20): Promise<{ notifications: NotificationItem[]; nextCursor: string | null }> => {
+export const getNotifications = async (
+  cursor?: string,
+  limit: number = 20
+): Promise<{ notifications: NotificationItem[]; nextCursor: string | null }> => {
   const params = new URLSearchParams({ limit: limit.toString() });
   if (cursor) {
     params.append('cursor', cursor);

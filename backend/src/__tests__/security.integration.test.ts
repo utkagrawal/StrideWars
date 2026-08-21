@@ -12,31 +12,39 @@ describe('Security Hardening', () => {
 
   beforeAll(async () => {
     // 0. Clean DB
-    await pool.query(`
+    await pool
+      .query(
+        `
       TRUNCATE TABLE 
         jobs, notifications, follows, territory_captures, 
         territories, run_points, runs, users 
       RESTART IDENTITY CASCADE
-    `).catch(() => {});
+    `
+      )
+      .catch(() => {});
 
     // Clean Redis to reset rate limits
     await redis.flushdb();
-    
+
     const timestamp = Date.now();
-    
+
     // 1. Setup 2 users
-    const res1 = await request(app).post('/api/auth/register').send({
-      username: `sec1${timestamp}`,
-      email: `sec1_${timestamp}@sec.com`,
-      password: 'password123',
-    });
+    const res1 = await request(app)
+      .post('/api/auth/register')
+      .send({
+        username: `sec1${timestamp}`,
+        email: `sec1_${timestamp}@sec.com`,
+        password: 'password123',
+      });
     user1Token = res1.body.accessToken;
 
-    const res2 = await request(app).post('/api/auth/register').send({
-      username: `sec2${timestamp}`,
-      email: `sec2_${timestamp}@sec.com`,
-      password: 'password123',
-    });
+    const res2 = await request(app)
+      .post('/api/auth/register')
+      .send({
+        username: `sec2${timestamp}`,
+        email: `sec2_${timestamp}@sec.com`,
+        password: 'password123',
+      });
     user2Token = res2.body.accessToken;
   });
 
@@ -63,12 +71,14 @@ describe('Security Hardening', () => {
   it('revokes refresh tokens on logout (token_version)', async () => {
     const timestamp = Date.now();
     const email = `revoke_${timestamp}@sec.com`;
-    const res = await request(app).post('/api/auth/register').send({
-      username: `revoke${timestamp}`,
-      email,
-      password: 'password123',
-    });
-    
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        username: `revoke${timestamp}`,
+        email,
+        password: 'password123',
+      });
+
     const cookies = (res.headers['set-cookie'] || []) as string[];
     const refreshTokenCookie = cookies.find((c) => c.startsWith('refreshToken=')) || '';
 
@@ -100,9 +110,9 @@ describe('Security Hardening', () => {
       .send({
         clientRunId: crypto.randomUUID(),
         startedAt: new Date().toISOString(),
-        points: [{ lat: 10, lng: 20, recordedAt: new Date().toISOString() }]
+        points: [{ lat: 10, lng: 20, recordedAt: new Date().toISOString() }],
       });
-    
+
     // We shouldn't hit rate limit because limit is 10 for runs.
     expect(runRes.status).toBe(201);
     const runId = runRes.body.run.id;

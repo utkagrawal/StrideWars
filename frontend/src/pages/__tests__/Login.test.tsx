@@ -37,7 +37,7 @@ describe('Login Page', () => {
     });
 
     renderLogin();
-    
+
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrongpass' } });
     fireEvent.click(screen.getByRole('button', { name: 'Login' }));

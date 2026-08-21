@@ -4,7 +4,7 @@ export async function followUser(followerId: string, followeeId: string): Promis
   if (followerId === followeeId) {
     return; // idempotent / no-op
   }
-  
+
   await pool.query(
     `INSERT INTO follows (follower_id, followee_id) 
      VALUES ($1, $2)
@@ -14,10 +14,10 @@ export async function followUser(followerId: string, followeeId: string): Promis
 }
 
 export async function unfollowUser(followerId: string, followeeId: string): Promise<void> {
-  await pool.query(
-    `DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`,
-    [followerId, followeeId]
-  );
+  await pool.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [
+    followerId,
+    followeeId,
+  ]);
 }
 
 export async function getFollowers(userId: string): Promise<{ id: string; username: string }[]> {
@@ -55,15 +55,19 @@ export interface FeedItem {
   timestamp: string;
 }
 
-export async function getFeed(userId: string, cursor?: string, limit: number = 20): Promise<{ items: FeedItem[]; nextCursor: string | null }> {
+export async function getFeed(
+  userId: string,
+  cursor?: string,
+  limit: number = 20
+): Promise<{ items: FeedItem[]; nextCursor: string | null }> {
   const params: any[] = [userId];
   let cursorClause = '';
-  
+
   if (cursor) {
     cursorClause = 'AND timestamp_val < $2';
     params.push(cursor);
   }
-  
+
   params.push(limit + 1); // For nextCursor
   const limitParamIndex = params.length;
 
@@ -115,7 +119,7 @@ export async function getFeed(userId: string, cursor?: string, limit: number = 2
     rows.pop();
   }
 
-  const items: FeedItem[] = rows.map(row => ({
+  const items: FeedItem[] = rows.map((row) => ({
     type: row.type,
     itemId: row.item_id,
     userId: row.user_id,
@@ -123,7 +127,7 @@ export async function getFeed(userId: string, cursor?: string, limit: number = 2
     geohash: row.geohash,
     distanceMeters: row.distance_meters ? parseFloat(row.distance_meters) : null,
     durationSeconds: row.duration_seconds ? parseInt(row.duration_seconds, 10) : null,
-    timestamp: row.timestamp_val.toISOString()
+    timestamp: row.timestamp_val.toISOString(),
   }));
 
   return { items, nextCursor };

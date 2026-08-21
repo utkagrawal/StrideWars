@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 async function reconcile() {
   console.log('Starting Leaderboard Reconciliation...');
-  
+
   await connectRedis();
 
   console.log('Fetching territory counts from Postgres...');
@@ -27,7 +27,7 @@ async function reconcile() {
 
   if (rows.length > 0) {
     const pipeline = redis.pipeline();
-    
+
     for (const row of rows) {
       pipeline.zadd('leaderboard:global', row.territory_count, row.owner_id);
     }

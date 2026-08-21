@@ -10,12 +10,12 @@ vi.mock('./hooks/useAuth', async (importOriginal) => {
   return {
     ...actual,
     useAuth: vi.fn(),
-    AuthProvider: ({ children }: any) => <>{children}</>
+    AuthProvider: ({ children }: any) => <>{children}</>,
   };
 });
 
 vi.mock('./api/notifications', () => ({
-  getUnreadCount: vi.fn().mockResolvedValue({ count: 0 })
+  getUnreadCount: vi.fn().mockResolvedValue({ count: 0 }),
 }));
 
 Object.defineProperty(global, 'localStorage', {
@@ -23,9 +23,9 @@ Object.defineProperty(global, 'localStorage', {
     getItem: vi.fn(),
     setItem: vi.fn(),
     removeItem: vi.fn(),
-    clear: vi.fn()
+    clear: vi.fn(),
   },
-  writable: true
+  writable: true,
 });
 
 const renderApp = () => {
@@ -43,13 +43,13 @@ describe('App Shell Navigation', () => {
 
   it('renders limited navigation when logged out', () => {
     (useAuthHook.useAuth as Mock).mockReturnValue({ user: null });
-    
+
     renderApp();
-    
+
     expect(screen.getByText('StrideWars')).toBeInTheDocument();
     expect(screen.getAllByText('Log In').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Sign Up').length).toBeGreaterThan(0);
-    
+
     // Auth-only links should not be present
     expect(screen.queryByText('Feed')).not.toBeInTheDocument();
     expect(screen.queryByText('Rankings')).not.toBeInTheDocument();
@@ -57,12 +57,12 @@ describe('App Shell Navigation', () => {
   });
 
   it('renders full navigation when logged in', () => {
-    (useAuthHook.useAuth as Mock).mockReturnValue({ 
-      user: { id: '1', username: 'testuser' } 
+    (useAuthHook.useAuth as Mock).mockReturnValue({
+      user: { id: '1', username: 'testuser' },
     });
-    
+
     renderApp();
-    
+
     expect(screen.getByText('StrideWars')).toBeInTheDocument();
     expect(screen.getByText('Feed')).toBeInTheDocument();
     expect(screen.getByText('Map')).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('App Shell Navigation', () => {
     expect(screen.getByText('+ Record')).toBeInTheDocument();
     expect(screen.getByText('Rankings')).toBeInTheDocument();
     expect(screen.getByText('Profile')).toBeInTheDocument();
-    
+
     // Logged out links should be gone
     expect(screen.queryByText('Log In')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign Up')).not.toBeInTheDocument();

@@ -18,13 +18,20 @@ describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
 
   it('safely handles concurrent worker instances polling the same job', async () => {
     // 1. Insert a single job
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO jobs (type, payload) 
       VALUES ($1, $2)
-    `, [
-      'territory_lost_notification',
-      { previousOwnerId: '00000000-0000-0000-0000-000000000000', newOwnerId: '11111111-1111-1111-1111-111111111111', geohash: 'gbsuv7y' }
-    ]);
+    `,
+      [
+        'territory_lost_notification',
+        {
+          previousOwnerId: '00000000-0000-0000-0000-000000000000',
+          newOwnerId: '11111111-1111-1111-1111-111111111111',
+          geohash: 'gbsuv7y',
+        },
+      ]
+    );
 
     // 2. Simulate two worker loops waking up at the exact same time
     const p1 = claimAndProcessJob();

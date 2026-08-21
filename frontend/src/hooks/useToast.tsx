@@ -28,25 +28,34 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        zIndex: 9999
-      }}>
-        {toasts.map(toast => (
-          <div key={toast.id} style={{
-            background: toast.type === 'error' ? 'var(--color-bg-error, #f44336)' : 
-                        toast.type === 'success' ? 'var(--color-brand-primary, #4ade80)' : '#2196f3',
-            color: 'white',
-            padding: '12px 24px',
-            borderRadius: '4px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            animation: 'slideIn 0.3s ease-out'
-          }}>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          zIndex: 9999,
+        }}
+      >
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              background:
+                toast.type === 'error'
+                  ? 'var(--color-bg-error, #f44336)'
+                  : toast.type === 'success'
+                    ? 'var(--color-brand-primary, #4ade80)'
+                    : '#2196f3',
+              color: 'white',
+              padding: '12px 24px',
+              borderRadius: '4px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              animation: 'slideIn 0.3s ease-out',
+            }}
+          >
             {toast.message}
           </div>
         ))}

@@ -2,11 +2,11 @@ import { pool } from '../config/db';
 
 async function profile() {
   console.log('--- Profiling Queries ---');
-  
+
   try {
     // Pick a random user that has runs and follows
     const userRes = await pool.query('SELECT id FROM users LIMIT 10');
-    const userIds = userRes.rows.map(r => r.id);
+    const userIds = userRes.rows.map((r) => r.id);
     const userId = userIds[0];
     const followerId = userIds[1];
 
@@ -19,7 +19,7 @@ async function profile() {
       LIMIT 10
     `;
     const res1 = await pool.query(q1, [userId]);
-    console.log(res1.rows.map(r => r['QUERY PLAN']).join('\n'));
+    console.log(res1.rows.map((r) => r['QUERY PLAN']).join('\n'));
 
     console.log(`\n\n=== 2. Territory Bbox Lookup ===`);
     const q2 = `
@@ -29,7 +29,7 @@ async function profile() {
     `;
     // We pass an array of geohashes (which mimics ngeohash.bboxes)
     const res2 = await pool.query(q2, [['9q8yyk', '9q8yym', '9q8yyq', '9q8yyw']]);
-    console.log(res2.rows.map(r => r['QUERY PLAN']).join('\n'));
+    console.log(res2.rows.map((r) => r['QUERY PLAN']).join('\n'));
 
     console.log(`\n\n=== 3. Feed Generation ===`);
     const q3 = `
@@ -60,7 +60,7 @@ async function profile() {
       LIMIT 20
     `;
     const res3 = await pool.query(q3, [followerId]);
-    console.log(res3.rows.map(r => r['QUERY PLAN']).join('\n'));
+    console.log(res3.rows.map((r) => r['QUERY PLAN']).join('\n'));
 
     console.log(`\n\n=== 4. Leaderboard Hydration (Mocking redis fetch) ===`);
     // Simulate finding 10 user IDs from Redis
@@ -71,8 +71,7 @@ async function profile() {
       WHERE id = ANY($1)
     `;
     const res4 = await pool.query(q4, [userIds]);
-    console.log(res4.rows.map(r => r['QUERY PLAN']).join('\n'));
-
+    console.log(res4.rows.map((r) => r['QUERY PLAN']).join('\n'));
   } catch (err) {
     console.error('Error profiling:', err);
   } finally {

@@ -21,17 +21,24 @@ export const unfollowUser = async (userId: string) => {
   return data;
 };
 
-export const getFollowers = async (userId: string): Promise<{ users: { id: string; username: string }[] }> => {
+export const getFollowers = async (
+  userId: string
+): Promise<{ users: { id: string; username: string }[] }> => {
   const { data } = await api.get(`/social/followers/${userId}`);
   return data;
 };
 
-export const getFollowing = async (userId: string): Promise<{ users: { id: string; username: string }[] }> => {
+export const getFollowing = async (
+  userId: string
+): Promise<{ users: { id: string; username: string }[] }> => {
   const { data } = await api.get(`/social/following/${userId}`);
   return data;
 };
 
-export const getFeed = async (cursor?: string, limit: number = 20): Promise<{ items: FeedItem[]; nextCursor: string | null }> => {
+export const getFeed = async (
+  cursor?: string,
+  limit: number = 20
+): Promise<{ items: FeedItem[]; nextCursor: string | null }> => {
   const params = new URLSearchParams({ limit: limit.toString() });
   if (cursor) {
     params.append('cursor', cursor);

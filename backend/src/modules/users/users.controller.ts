@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import * as usersService from './users.service';
 
-export async function getMe(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+export async function getMe(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void | Response> {
   try {
     const userId = req.user!.userId;
     const user = await usersService.getUserById(userId);
@@ -21,7 +25,11 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
-export async function updateMe(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+export async function updateMe(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void | Response> {
   try {
     const userId = req.user!.userId;
     const { displayName } = req.body as { displayName: string };
@@ -43,7 +51,11 @@ export async function updateMe(req: Request, res: Response, next: NextFunction):
   }
 }
 
-export async function getUser(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+export async function getUser(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void | Response> {
   try {
     const { id } = req.params;
     const user = await usersService.getPublicUserById(id);

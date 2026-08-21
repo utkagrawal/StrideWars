@@ -7,14 +7,14 @@ import { followUser, unfollowUser, getFollowers, getFollowing } from '../api/soc
 export const Profile = () => {
   const { id } = useParams<{ id?: string }>();
   const { user, logout } = useAuth();
-  
+
   const isOwnProfile = !id || id === user?.id;
   const targetUserId = id || user?.id;
 
   const [profileUser, setProfileUser] = useState<any>(null);
   const [displayName, setDisplayName] = useState('');
   const [message, setMessage] = useState('');
-  
+
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -41,9 +41,9 @@ export const Profile = () => {
       // 2. Fetch social stats
       const [followersData, followingData] = await Promise.all([
         getFollowers(targetUserId!),
-        getFollowing(targetUserId!)
+        getFollowing(targetUserId!),
       ]);
-      
+
       setFollowersCount(followersData.users.length);
       setFollowingCount(followingData.users.length);
 
@@ -76,11 +76,11 @@ export const Profile = () => {
       if (isFollowing) {
         await unfollowUser(targetUserId);
         setIsFollowing(false);
-        setFollowersCount(prev => prev - 1);
+        setFollowersCount((prev) => prev - 1);
       } else {
         await followUser(targetUserId);
         setIsFollowing(true);
-        setFollowersCount(prev => prev + 1);
+        setFollowersCount((prev) => prev + 1);
       }
     } catch (err) {
       console.error(err);
@@ -91,11 +91,21 @@ export const Profile = () => {
   if (!profileUser) return <div>User not found.</div>;
 
   return (
-    <div className="profile-container" style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+    <div
+      className="profile-container"
+      style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+        }}
+      >
         <h2>{isOwnProfile ? 'Your Profile' : `${profileUser.username}'s Profile`}</h2>
         {!isOwnProfile && (
-          <button 
+          <button
             onClick={handleFollowToggle}
             style={{
               background: isFollowing ? 'transparent' : 'var(--color-brand-primary)',
@@ -103,20 +113,45 @@ export const Profile = () => {
               padding: '0.5rem 1rem',
               borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
-              color: 'white'
+              color: 'white',
             }}
           >
             {isFollowing ? 'Unfollow' : 'Follow'}
           </button>
         )}
       </div>
-      
-      <div style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem' }}>
-        <p><strong>Username:</strong> {profileUser.username}</p>
-        {isOwnProfile && <p><strong>Email:</strong> {profileUser.email}</p>}
-        {profileUser.displayName && <p><strong>Display Name:</strong> {profileUser.displayName}</p>}
-        
-        <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-bg-elevated)' }}>
+
+      <div
+        style={{
+          background: 'var(--color-bg-surface)',
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '2rem',
+        }}
+      >
+        <p>
+          <strong>Username:</strong> {profileUser.username}
+        </p>
+        {isOwnProfile && (
+          <p>
+            <strong>Email:</strong> {profileUser.email}
+          </p>
+        )}
+        {profileUser.displayName && (
+          <p>
+            <strong>Display Name:</strong> {profileUser.displayName}
+          </p>
+        )}
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '2rem',
+            marginTop: '1.5rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid var(--color-bg-elevated)',
+          }}
+        >
           <div>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{followersCount}</div>
             <div style={{ color: 'var(--color-text-secondary)' }}>Followers</div>
@@ -127,7 +162,9 @@ export const Profile = () => {
           </div>
         </div>
         {followersCount === 0 && (
-          <p style={{ color: 'var(--color-text-secondary)', marginTop: '1rem', fontSize: '0.9rem' }}>
+          <p
+            style={{ color: 'var(--color-text-secondary)', marginTop: '1rem', fontSize: '0.9rem' }}
+          >
             No followers yet. Start capturing ground to get noticed!
           </p>
         )}
@@ -135,7 +172,16 @@ export const Profile = () => {
 
       {isOwnProfile && (
         <>
-          <form onSubmit={handleUpdate} className="update-form" style={{ background: 'var(--color-bg-surface)', padding: '1.5rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem' }}>
+          <form
+            onSubmit={handleUpdate}
+            className="update-form"
+            style={{
+              background: 'var(--color-bg-surface)',
+              padding: '1.5rem',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '2rem',
+            }}
+          >
             <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Edit Profile</h3>
             <div className="form-group" style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem' }}>Display Name</label>
@@ -144,16 +190,51 @@ export const Profile = () => {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Set a public display name"
-                style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', background: 'var(--color-bg-elevated)', color: 'white' }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-elevated)',
+                  color: 'white',
+                }}
               />
             </div>
-            <button type="submit" style={{ padding: '0.75rem 1.5rem', background: 'var(--color-brand-primary)', border: 'none', borderRadius: 'var(--radius-sm)', color: 'white', cursor: 'pointer' }}>
+            <button
+              type="submit"
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'var(--color-brand-primary)',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
               Update Profile
             </button>
-            {message && <p className="status-message" style={{ marginTop: '1rem', color: 'var(--color-brand-primary)' }}>{message}</p>}
+            {message && (
+              <p
+                className="status-message"
+                style={{ marginTop: '1rem', color: 'var(--color-brand-primary)' }}
+              >
+                {message}
+              </p>
+            )}
           </form>
 
-          <button onClick={logout} style={{ width: '100%', padding: '1rem', background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
+          <button
+            onClick={logout}
+            style={{
+              width: '100%',
+              padding: '1rem',
+              background: 'transparent',
+              border: '1px solid #ef4444',
+              color: '#ef4444',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+            }}
+          >
             Logout
           </button>
         </>

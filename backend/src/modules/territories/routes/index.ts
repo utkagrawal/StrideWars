@@ -3,7 +3,12 @@ import { query, param, CustomValidator } from 'express-validator';
 import { requireAuth } from '../../../middleware/requireAuth';
 import { validate } from '../../../middleware/validate';
 import { asyncHandler } from '../../../middleware/asyncHandler';
-import { getTerritories, getTerritory, getTerritoryHistory, getMyTerritories } from '../territories.controller';
+import {
+  getTerritories,
+  getTerritory,
+  getTerritoryHistory,
+  getMyTerritories,
+} from '../territories.controller';
 
 const router = Router();
 
@@ -33,24 +38,21 @@ const isBbox: CustomValidator = (value) => {
 router.get(
   '/',
   requireAuth,
-  [
-    query('bbox').exists().withMessage('bbox is required').custom(isBbox)
-  ],
+  [query('bbox').exists().withMessage('bbox is required').custom(isBbox)],
   validate,
   asyncHandler(getTerritories)
 );
 
-router.get(
-  '/mine',
-  requireAuth,
-  asyncHandler(getMyTerritories)
-);
+router.get('/mine', requireAuth, asyncHandler(getMyTerritories));
 
 router.get(
   '/:geohash',
   requireAuth,
   [
-    param('geohash').isString().isLength({ min: 1, max: 12 }).withMessage('Invalid geohash parameter')
+    param('geohash')
+      .isString()
+      .isLength({ min: 1, max: 12 })
+      .withMessage('Invalid geohash parameter'),
   ],
   validate,
   asyncHandler(getTerritory)
@@ -60,7 +62,10 @@ router.get(
   '/history/:geohash',
   requireAuth,
   [
-    param('geohash').isString().isLength({ min: 1, max: 12 }).withMessage('Invalid geohash parameter')
+    param('geohash')
+      .isString()
+      .isLength({ min: 1, max: 12 })
+      .withMessage('Invalid geohash parameter'),
   ],
   validate,
   asyncHandler(getTerritoryHistory)

@@ -41,13 +41,19 @@ class StubXMLHttpRequest {
   onload = null;
   ontimeout = null;
   upload = { addEventListener: () => {} };
-  getAllResponseHeaders() { return ''; }
-  getResponseHeader() { return null; }
+  getAllResponseHeaders() {
+    return '';
+  }
+  getResponseHeader() {
+    return null;
+  }
   addEventListener(evt: string, cb: Function) {
     if (evt === 'error') this.onerror = cb;
   }
   removeEventListener() {}
-  dispatchEvent() { return true; }
+  dispatchEvent() {
+    return true;
+  }
 }
 vi.stubGlobal('XMLHttpRequest', StubXMLHttpRequest);
 
@@ -69,8 +75,8 @@ const mockCreateRun = vi.fn().mockResolvedValue({
 
 const mockGenerateRoadLoop = vi.fn().mockResolvedValue([
   { lat: 26.1878, lng: 91.6916, recordedAt: new Date().toISOString() },
-  { lat: 26.1880, lng: 91.6918, recordedAt: new Date(Date.now() + 1000).toISOString() },
-  { lat: 26.1882, lng: 91.6920, recordedAt: new Date(Date.now() + 2000).toISOString() },
+  { lat: 26.188, lng: 91.6918, recordedAt: new Date(Date.now() + 1000).toISOString() },
+  { lat: 26.1882, lng: 91.692, recordedAt: new Date(Date.now() + 2000).toISOString() },
   { lat: 26.1878, lng: 91.6916, recordedAt: new Date(Date.now() + 3000).toISOString() },
 ]);
 
@@ -184,11 +190,14 @@ describe('Phase 21 – GPS Readout State', () => {
     }
 
     // Wait for the GPS readout to populate (it updates every 2s, but we can advance timers if needed, or wait)
-    await waitFor(() => {
-      const gpsElements = screen.getAllByText(/GPS:/);
-      expect(gpsElements.length).toBeGreaterThan(0);
-      expect(gpsElements.length).toBeLessThanOrEqual(5);
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        const gpsElements = screen.getAllByText(/GPS:/);
+        expect(gpsElements.length).toBeGreaterThan(0);
+        expect(gpsElements.length).toBeLessThanOrEqual(5);
+      },
+      { timeout: 3000 }
+    );
 
     // Verify coordinates match generated points logic (approx 26.18, 91.69)
     expect(screen.getByText(/26\.18/)).toBeInTheDocument();
@@ -277,10 +286,7 @@ describe('Phase 21 – One-click Generate Random Loop', () => {
 
     fireEvent.click(screen.getByText('Random Loop'));
 
-    await waitFor(
-      () => screen.getByText('🎉 You claimed this ground!'),
-      { timeout: 5000 }
-    );
+    await waitFor(() => screen.getByText('🎉 You claimed this ground!'), { timeout: 5000 });
 
     fireEvent.click(screen.getByText('Close'));
     expect(screen.getByText('Ready to Run')).toBeInTheDocument();

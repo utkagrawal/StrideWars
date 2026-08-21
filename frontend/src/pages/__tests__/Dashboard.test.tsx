@@ -17,16 +17,14 @@ vi.mock('../../api/notifications');
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: '1', username: 'testuser' } }),
-  AuthProvider: ({ children }: any) => <>{children}</>
+  AuthProvider: ({ children }: any) => <>{children}</>,
 }));
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <BrowserRouter>
       <AuthProvider>
-        <ToastProvider>
-          {ui}
-        </ToastProvider>
+        <ToastProvider>{ui}</ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -48,7 +46,22 @@ describe('Dashboard (HomePage)', () => {
   });
 
   it('renders dashboard data when fetch is successful', async () => {
-    (runsApi.getRuns as Mock).mockResolvedValue({ runs: [{ id: '1', distance_meters: 5000, duration_seconds: 1500, started_at: new Date().toISOString() }, { id: '2', distance_meters: 3000, duration_seconds: 900, started_at: new Date().toISOString() }] });
+    (runsApi.getRuns as Mock).mockResolvedValue({
+      runs: [
+        {
+          id: '1',
+          distance_meters: 5000,
+          duration_seconds: 1500,
+          started_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          distance_meters: 3000,
+          duration_seconds: 900,
+          started_at: new Date().toISOString(),
+        },
+      ],
+    });
     (territoriesApi.getMyTerritories as Mock).mockResolvedValue([{ geohash: '9q8yyk' }]);
     (leaderboardsApi.getUserGlobalRank as Mock).mockResolvedValue({ rank: 42 });
     (notificationsApi.getUnreadCount as Mock).mockResolvedValue({ count: 3 });

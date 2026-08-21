@@ -16,7 +16,12 @@ export interface Point {
  * @param lon2 Longitude of point 2 in degrees
  * @returns Distance in meters
  */
-export function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function calculateHaversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
   const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
   const φ1 = toRadians(lat1);
@@ -27,7 +32,7 @@ export function calculateHaversineDistance(lat1: number, lon1: number, lat2: num
   const a =
     Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
     Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  
+
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
@@ -54,7 +59,7 @@ export function calculateTotalDistance(points: Point[]): number {
 
 /**
  * Calculates the average pace in seconds per kilometer.
- * 
+ *
  * @param distanceMeters Total distance in meters
  * @param durationSeconds Total duration in seconds
  * @returns Average pace in seconds per km (null if distance is 0 to avoid Infinity)
@@ -68,7 +73,7 @@ export function calculatePace(distanceMeters: number, durationSeconds: number): 
 /**
  * Calculates the orthogonal distance from a point to a line segment defined by start/end.
  * Uses a flat-earth approximation scaled by latitude, which is highly accurate for small distances.
- * 
+ *
  * @param pt The point
  * @param lineStart The start of the line segment
  * @param lineEnd The end of the line segment
@@ -82,19 +87,19 @@ export function perpendicularDistance(pt: Point, lineStart: Point, lineEnd: Poin
   // Convert to meters relative to an arbitrary origin (0,0) for the local calculation
   // 1 degree of latitude is roughly 111,320 meters
   const degToMeters = 111320;
-  
+
   const x = pt.lng * latScale * degToMeters;
   const y = pt.lat * degToMeters;
-  
+
   const x1 = lineStart.lng * latScale * degToMeters;
   const y1 = lineStart.lat * degToMeters;
-  
+
   const x2 = lineEnd.lng * latScale * degToMeters;
   const y2 = lineEnd.lat * degToMeters;
 
   const dx = x2 - x1;
   const dy = y2 - y1;
-  
+
   // If lineStart == lineEnd
   if (dx === 0 && dy === 0) {
     return Math.sqrt(Math.pow(x - x1, 2) + Math.pow(y - y1, 2));
@@ -122,7 +127,7 @@ export function perpendicularDistance(pt: Point, lineStart: Point, lineEnd: Poin
 /**
  * Douglas-Peucker line simplification algorithm.
  * Recursively reduces the number of points in a curve that is approximated by a series of points.
- * 
+ *
  * @param points Array of ordered points
  * @param tolerance Tolerance in meters
  * @returns Array of simplified points
@@ -150,7 +155,7 @@ export function douglasPeucker<T extends Point>(points: T[], tolerance: number):
   if (maxDistance > tolerance) {
     const leftLine = douglasPeucker(points.slice(0, index + 1), tolerance);
     const rightLine = douglasPeucker(points.slice(index), tolerance);
-    
+
     // Concat, avoiding duplicating the point at `index`
     return [...leftLine.slice(0, leftLine.length - 1), ...rightLine];
   } else {
@@ -165,12 +170,15 @@ export function douglasPeucker<T extends Point>(points: T[], tolerance: number):
  * @param closeThresholdMeters Threshold in meters (default 30m)
  * @returns A new array of points that is guaranteed to be closed (first == last) if it wasn't already.
  */
-export function autoClosePath<T extends Point>(points: T[], closeThresholdMeters: number = 30): T[] {
+export function autoClosePath<T extends Point>(
+  points: T[],
+  closeThresholdMeters: number = 30
+): T[] {
   if (points.length < 2) return [...points];
-  
+
   const first = points[0];
   const last = points[points.length - 1];
-  
+
   const dist = calculateHaversineDistance(first.lat, first.lng, last.lat, last.lng);
   if (dist > closeThresholdMeters) {
     return [...points, { ...first }]; // Append a synthetic point equal to the first point
@@ -198,17 +206,17 @@ export function polygonArea(points: Point[]): number {
     sumLng += points[i].lng;
   }
   const centroidLat = sumLat / uniquePoints;
-  
+
   // 2. Project points to local planar meters
   const centroidLatRad = (centroidLat * Math.PI) / 180;
   const cosLat = Math.cos(centroidLatRad);
-  
-  const projected = points.map(pt => {
+
+  const projected = points.map((pt) => {
     const latRad = (pt.lat * Math.PI) / 180;
     const lngRad = (pt.lng * Math.PI) / 180;
     return {
       x: R * lngRad * cosLat,
-      y: R * latRad
+      y: R * latRad,
     };
   });
 
@@ -217,9 +225,9 @@ export function polygonArea(points: Point[]): number {
   for (let i = 0; i < projected.length - 1; i++) {
     const curr = projected[i];
     const next = projected[i + 1];
-    area += (curr.x * next.y) - (next.x * curr.y);
+    area += curr.x * next.y - next.x * curr.y;
   }
-  
+
   return Math.abs(area) / 2;
 }
 
@@ -234,7 +242,7 @@ export function isPointInPolygon(pt: Point, polygon: Point[]): boolean {
   let inside = false;
   const x = pt.lng;
   const y = pt.lat;
-  
+
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].lng;
     const yi = polygon[i].lat;
@@ -252,23 +260,33 @@ export function isPointInPolygon(pt: Point, polygon: Point[]): boolean {
     // Check if point is on a non-horizontal edge using cross product (collinearity)
     const crossProduct = (y - yi) * (xj - xi) - (x - xi) * (yj - yi);
     if (Math.abs(crossProduct) < 1e-9) {
-      if (x >= Math.min(xi, xj) && x <= Math.max(xi, xj) && y >= Math.min(yi, yj) && y <= Math.max(yi, yj)) {
+      if (
+        x >= Math.min(xi, xj) &&
+        x <= Math.max(xi, xj) &&
+        y >= Math.min(yi, yj) &&
+        y <= Math.max(yi, yj)
+      ) {
         return true; // On boundary
       }
     }
 
     // Ray casting check (horizontal ray pointing in +x direction)
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
-  
+
   return inside;
 }
 
 /**
  * Computes the bounding box of a polygon.
  */
-export function getPolygonBoundingBox(points: Point[]): { minLat: number; maxLat: number; minLng: number; maxLng: number } {
+export function getPolygonBoundingBox(points: Point[]): {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+} {
   let minLat = Infinity;
   let maxLat = -Infinity;
   let minLng = Infinity;
@@ -287,29 +305,41 @@ export function getPolygonBoundingBox(points: Point[]): { minLat: number; maxLat
 import ngeohash from 'ngeohash';
 
 /**
- * Traces the perimeter of a set of contiguous geohashes by extracting all 
+ * Traces the perimeter of a set of contiguous geohashes by extracting all
  * outer edges (canceling out internal shared edges) and forming closed rings.
  */
 export function traceClusterPerimeter(hashes: string[]): [number, number][][] {
   if (hashes.length === 0) return [];
-  
-  const edges = new Map<string, { start: [number, number], end: [number, number] }>();
-  
+
+  const edges = new Map<string, { start: [number, number]; end: [number, number] }>();
+
   const toKey = (lat: number, lng: number) => `${lat.toFixed(6)},${lng.toFixed(6)}`;
 
   for (const hash of hashes) {
     const [minLat, minLng, maxLat, maxLng] = ngeohash.decode_bbox(hash);
-    
+
     // CCW directed edges for the cell
-    const e1 = { start: [minLat, minLng] as [number, number], end: [minLat, maxLng] as [number, number] }; // South
-    const e2 = { start: [minLat, maxLng] as [number, number], end: [maxLat, maxLng] as [number, number] }; // East
-    const e3 = { start: [maxLat, maxLng] as [number, number], end: [maxLat, minLng] as [number, number] }; // North
-    const e4 = { start: [maxLat, minLng] as [number, number], end: [minLat, minLng] as [number, number] }; // West
-    
+    const e1 = {
+      start: [minLat, minLng] as [number, number],
+      end: [minLat, maxLng] as [number, number],
+    }; // South
+    const e2 = {
+      start: [minLat, maxLng] as [number, number],
+      end: [maxLat, maxLng] as [number, number],
+    }; // East
+    const e3 = {
+      start: [maxLat, maxLng] as [number, number],
+      end: [maxLat, minLng] as [number, number],
+    }; // North
+    const e4 = {
+      start: [maxLat, minLng] as [number, number],
+      end: [minLat, minLng] as [number, number],
+    }; // West
+
     for (const e of [e1, e2, e3, e4]) {
       const edgeKey = `${toKey(e.start[0], e.start[1])}->${toKey(e.end[0], e.end[1])}`;
       const reverseKey = `${toKey(e.end[0], e.end[1])}->${toKey(e.start[0], e.start[1])}`;
-      
+
       if (edges.has(reverseKey)) {
         edges.delete(reverseKey); // Cancel out internal edge
       } else {
@@ -317,33 +347,33 @@ export function traceClusterPerimeter(hashes: string[]): [number, number][][] {
       }
     }
   }
-  
-  const startToEdge = new Map<string, { start: [number, number], end: [number, number] }>();
+
+  const startToEdge = new Map<string, { start: [number, number]; end: [number, number] }>();
   for (const e of edges.values()) {
     startToEdge.set(toKey(e.start[0], e.start[1]), e);
   }
-  
+
   const rings: [number, number][][] = [];
-  
+
   while (startToEdge.size > 0) {
     const firstKey = startToEdge.keys().next().value;
     if (!firstKey) break;
     const ring: [number, number][] = [];
     let currentKey = firstKey;
-    
+
     while (startToEdge.has(currentKey)) {
       const edge = startToEdge.get(currentKey)!;
       startToEdge.delete(currentKey);
       ring.push(edge.start);
       currentKey = toKey(edge.end[0], edge.end[1]);
     }
-    
+
     if (ring.length > 0) {
       ring.push(ring[0]); // close the loop explicitly
       rings.push(ring);
     }
   }
-  
+
   return rings;
 }
 
@@ -351,25 +381,31 @@ export function traceClusterPerimeter(hashes: string[]): [number, number][][] {
  * Given a start point, initial bearing, and distance, this will calculate the
  * destination point using the spherical destination-point formula.
  */
-export function destinationPoint(lat: number, lng: number, bearingDeg: number, distanceMeters: number): Point {
+export function destinationPoint(
+  lat: number,
+  lng: number,
+  bearingDeg: number,
+  distanceMeters: number
+): Point {
   const delta = distanceMeters / R; // angular distance in radians
   const theta = (bearingDeg * Math.PI) / 180; // bearing in radians
-  
+
   const phi1 = (lat * Math.PI) / 180;
   const lambda1 = (lng * Math.PI) / 180;
-  
+
   const phi2 = Math.asin(
-    Math.sin(phi1) * Math.cos(delta) +
-    Math.cos(phi1) * Math.sin(delta) * Math.cos(theta)
+    Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(theta)
   );
-  
-  const lambda2 = lambda1 + Math.atan2(
-    Math.sin(theta) * Math.sin(delta) * Math.cos(phi1),
-    Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2)
-  );
-  
+
+  const lambda2 =
+    lambda1 +
+    Math.atan2(
+      Math.sin(theta) * Math.sin(delta) * Math.cos(phi1),
+      Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2)
+    );
+
   let lngResult = (lambda2 * 180) / Math.PI;
-  lngResult = (lngResult + 540) % 360 - 180;
+  lngResult = ((lngResult + 540) % 360) - 180;
 
   return {
     lat: (phi2 * 180) / Math.PI,
@@ -380,49 +416,59 @@ export function destinationPoint(lat: number, lng: number, bearingDeg: number, d
 /**
  * Generates a random closed loop of points around a center for demo purposes.
  */
-export function generateRandomLoop(centerLat: number, centerLng: number, numPoints = 12, baseRadius = 150): (Point & { recordedAt: string })[] {
+export function generateRandomLoop(
+  centerLat: number,
+  centerLng: number,
+  numPoints = 12,
+  baseRadius = 150
+): (Point & { recordedAt: string })[] {
   const points: (Point & { recordedAt: string })[] = [];
   const now = new Date();
-  
+
   for (let i = 0; i < numPoints; i++) {
     const angle = (360 / numPoints) * i;
     const jitteredAngle = angle + (Math.random() * 20 - 10);
     const jitteredRadius = baseRadius + (Math.random() * 100 - 50);
-    
+
     const pt = destinationPoint(centerLat, centerLng, jitteredAngle, jitteredRadius);
     points.push({ ...pt, recordedAt: new Date(now.getTime() + i * 1000).toISOString() });
   }
-  
-  points.push({ 
-    lat: points[0].lat, 
-    lng: points[0].lng, 
-    recordedAt: new Date(now.getTime() + numPoints * 1000).toISOString() 
+
+  points.push({
+    lat: points[0].lat,
+    lng: points[0].lng,
+    recordedAt: new Date(now.getTime() + numPoints * 1000).toISOString(),
   });
-  
+
   return points;
 }
 
 /**
- * Generates a pseudo-path along actual roads by fetching OSM data and 
+ * Generates a pseudo-path along actual roads by fetching OSM data and
  * performing a bounded random walk. Falls back to a circular loop on failure.
  */
-export async function generateRoadLoop(centerLat: number, centerLng: number, minDistance = 300, maxDistance = 800): Promise<(Point & { recordedAt: string })[]> {
+export async function generateRoadLoop(
+  centerLat: number,
+  centerLng: number,
+  minDistance = 300,
+  maxDistance = 800
+): Promise<(Point & { recordedAt: string })[]> {
   try {
     const radius = 500;
     const query = `[out:json];way(around:${radius},${centerLat},${centerLng})["highway"~"primary|secondary|tertiary|residential|unclassified|pedestrian"];(._;>;);out;`;
-    
+
     const response = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       body: `data=${encodeURIComponent(query)}`,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
     if (!response.ok) {
       throw new Error(`Overpass API error: ${response.status}`);
     }
 
-    const data = await response.json() as any;
-    
+    const data = (await response.json()) as any;
+
     const nodes = new Map<number, Point>();
     const edges = new Map<number, number[]>();
 
@@ -437,10 +483,10 @@ export async function generateRoadLoop(centerLat: number, centerLng: number, min
         for (let i = 0; i < el.nodes.length - 1; i++) {
           const u = el.nodes[i];
           const v = el.nodes[i + 1];
-          
+
           if (!edges.has(u)) edges.set(u, []);
           if (!edges.has(v)) edges.set(v, []);
-          
+
           edges.get(u)!.push(v);
           edges.get(v)!.push(u);
         }
@@ -453,7 +499,7 @@ export async function generateRoadLoop(centerLat: number, centerLng: number, min
 
     let nearestNodeId = -1;
     let minDistanceToCenter = Infinity;
-    
+
     for (const [id, pt] of nodes.entries()) {
       if (edges.has(id) && edges.get(id)!.length > 0) {
         const dist = calculateHaversineDistance(centerLat, centerLng, pt.lat, pt.lng);
@@ -476,22 +522,22 @@ export async function generateRoadLoop(centerLat: number, centerLng: number, min
 
     for (let steps = 0; steps < 500; steps++) {
       const neighbors = edges.get(currId)!;
-      let validNeighbors = neighbors.filter(n => n !== lastId);
+      let validNeighbors = neighbors.filter((n) => n !== lastId);
       if (validNeighbors.length === 0) {
         validNeighbors = neighbors;
       }
-      
+
       const nextId = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
-      
+
       const p1 = nodes.get(currId)!;
       const p2 = nodes.get(nextId)!;
-      
+
       currentDistance += calculateHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
-      
+
       pathIds.push(nextId);
       lastId = currId;
       currId = nextId;
-      
+
       if (currentDistance >= targetDistance) {
         break;
       }
@@ -499,20 +545,20 @@ export async function generateRoadLoop(centerLat: number, centerLng: number, min
 
     const now = new Date();
     const points: (Point & { recordedAt: string })[] = [];
-    
+
     for (let i = 0; i < pathIds.length; i++) {
       const pt = nodes.get(pathIds[i])!;
       points.push({
         lat: pt.lat,
         lng: pt.lng,
-        recordedAt: new Date(now.getTime() + i * 1000).toISOString()
+        recordedAt: new Date(now.getTime() + i * 1000).toISOString(),
       });
     }
 
     points.push({
       lat: points[0].lat,
       lng: points[0].lng,
-      recordedAt: new Date(now.getTime() + pathIds.length * 1000).toISOString()
+      recordedAt: new Date(now.getTime() + pathIds.length * 1000).toISOString(),
     });
 
     return points;

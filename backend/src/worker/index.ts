@@ -10,21 +10,22 @@ const MAX_ATTEMPTS = 5;
 
 async function processJob(job: any): Promise<void> {
   const { type, payload } = job;
-  
+
   if (type === 'territory_lost_notification') {
     const { previousOwnerId, newOwnerId, geohash } = payload;
-    
+
     // Create the notification
     const notificationPayload = {
       message: `You lost territory ${geohash} to another player!`,
       geohash,
       lostToUserId: newOwnerId,
     };
-    
-    await pool.query(
-      `INSERT INTO notifications (user_id, type, payload) VALUES ($1, $2, $3)`,
-      [previousOwnerId, 'territory_lost', notificationPayload]
-    );
+
+    await pool.query(`INSERT INTO notifications (user_id, type, payload) VALUES ($1, $2, $3)`, [
+      previousOwnerId,
+      'territory_lost',
+      notificationPayload,
+    ]);
   } else {
     console.warn(`[Worker] Unknown job type: ${type}`);
   }
@@ -33,11 +34,11 @@ async function processJob(job: any): Promise<void> {
 async function claimAndProcessJob() {
   const client = await pool.connect();
   let jobId: string | null = null;
-  
+
   try {
     // 1. Claim a job atomically using FOR UPDATE SKIP LOCKED
     await client.query('BEGIN');
-    
+
     const { rows } = await client.query(`
       UPDATE jobs 
       SET status = 'processing', attempts = attempts + 1
@@ -50,29 +51,28 @@ async function claimAndProcessJob() {
       )
       RETURNING *
     `);
-    
+
     if (rows.length === 0) {
       // No pending jobs
       await client.query('COMMIT');
-      return false; 
+      return false;
     }
-    
+
     const job = rows[0];
     jobId = job.id;
     await client.query('COMMIT');
-    
+
     // 2. Process the job
     await processJob(job);
-    
+
     // 3. Mark as done
     await pool.query(`UPDATE jobs SET status = 'done' WHERE id = $1`, [jobId]);
     return true; // We processed a job, might be more
-    
   } catch (err) {
     if (client) {
       await client.query('ROLLBACK').catch(() => {});
     }
-    
+
     if (jobId) {
       try {
         const { rows } = await pool.query(`SELECT attempts FROM jobs WHERE id = $1`, [jobId]);
@@ -102,28 +102,28 @@ async function workerLoop() {
       // If no job was found, wait POLL_INTERVAL_MS.
       const processed = await claimAndProcessJob();
       if (!processed) {
-        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       }
     } catch (err) {
       console.error('[Worker] Loop error:', err);
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   }
 }
 
 async function start() {
   await connectRedis(); // Initialize redis if needed
-  
+
   // Test DB connection
   await pool.query('SELECT 1');
   console.log('[Worker] Connected to PostgreSQL');
-  
+
   workerLoop();
 }
 
 // Only run if called directly
 if (require.main === module) {
-  start().catch(err => {
+  start().catch((err) => {
     console.error('[Worker] Startup failed:', err);
     process.exit(1);
   });

@@ -7,7 +7,7 @@ import { env } from './env';
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   // Phase 14 Performance Tuning:
-  // For a single Node.js instance, max: 20 is typically optimal because Node's single 
+  // For a single Node.js instance, max: 20 is typically optimal because Node's single
   // thread will CPU-bottleneck before it can actively saturate >20 concurrent queries.
   // If we scale to dozens of Node instances behind a load balancer, this could overwhelm
   // Postgres with idle connections (e.g., 50 pods * 20 = 1000 connections).

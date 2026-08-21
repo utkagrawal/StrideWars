@@ -1,4 +1,11 @@
-import { hashPassword, comparePassword, generateAccessToken, generateRefreshToken, verifyRefreshToken, User } from '../auth.service';
+import {
+  hashPassword,
+  comparePassword,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+  User,
+} from '../auth.service';
 import jwt from 'jsonwebtoken';
 
 jest.mock('jsonwebtoken', () => ({

@@ -33,18 +33,18 @@ describe('Register Page', () => {
 
   it('shows validation errors', async () => {
     (api.post as import('vitest').Mock).mockRejectedValueOnce({
-      response: { 
-        data: { 
-          error: { 
-            code: 'VALIDATION_ERROR', 
-            details: [{ msg: 'Password too short' }] 
-          } 
-        } 
+      response: {
+        data: {
+          error: {
+            code: 'VALIDATION_ERROR',
+            details: [{ msg: 'Password too short' }],
+          },
+        },
       },
     });
 
     renderRegister();
-    
+
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'test' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@test.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });

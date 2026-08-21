@@ -7,7 +7,10 @@ export const RecordRun = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pointsJson, setPointsJson] = useState('');
-  const [successData, setSuccessData] = useState<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[] } | null>(null);
+  const [successData, setSuccessData] = useState<{
+    run: Run;
+    capturedTerritories: { geohash: string; previousOwnerId: string | null }[];
+  } | null>(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
 
@@ -16,7 +19,7 @@ export const RecordRun = () => {
     const baseLat = 37.7749;
     const baseLng = -122.4194;
     const startTime = new Date();
-    
+
     const mockPoints: PointInput[] = [];
     for (let i = 0; i < 10; i++) {
       mockPoints.push({
@@ -31,7 +34,7 @@ export const RecordRun = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       let parsedPoints: PointInput[] = [];
       try {
@@ -65,17 +68,40 @@ export const RecordRun = () => {
     return (
       <div className="auth-container" style={{ textAlign: 'center' }}>
         <h2 style={{ color: 'var(--color-brand-primary)' }}>Run Uploaded Successfully!</h2>
-        
-        <div style={{ background: 'var(--color-bg-elevated)', padding: '2rem', borderRadius: 'var(--radius-md)', margin: '2rem 0' }}>
-          <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{successData.capturedTerritories.length}</h3>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>Territories Captured</p>
-          
+
+        <div
+          style={{
+            background: 'var(--color-bg-elevated)',
+            padding: '2rem',
+            borderRadius: 'var(--radius-md)',
+            margin: '2rem 0',
+          }}
+        >
+          <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+            {successData.capturedTerritories.length}
+          </h3>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            Territories Captured
+          </p>
+
           {successData.capturedTerritories.length > 0 && (
-            <div style={{ maxHeight: '150px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '4px' }}>
-              {successData.capturedTerritories.map(t => (
+            <div
+              style={{
+                maxHeight: '150px',
+                overflowY: 'auto',
+                background: 'rgba(0,0,0,0.2)',
+                padding: '1rem',
+                borderRadius: '4px',
+              }}
+            >
+              {successData.capturedTerritories.map((t) => (
                 <div key={t.geohash} style={{ fontSize: '0.9rem', marginBottom: '0.25rem' }}>
                   Captured <span style={{ fontFamily: 'monospace' }}>{t.geohash}</span>
-                  {t.previousOwnerId && <span style={{ color: 'var(--color-error)', marginLeft: '0.5rem' }}>(Stolen!)</span>}
+                  {t.previousOwnerId && (
+                    <span style={{ color: 'var(--color-error)', marginLeft: '0.5rem' }}>
+                      (Stolen!)
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -84,7 +110,11 @@ export const RecordRun = () => {
 
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
           <Link to={`/runs/${successData.run.id}`}>
-            <button style={{ background: 'transparent', border: '1px solid var(--color-brand-primary)' }}>View Run Details</button>
+            <button
+              style={{ background: 'transparent', border: '1px solid var(--color-brand-primary)' }}
+            >
+              View Run Details
+            </button>
           </Link>
           <Link to="/territories">
             <button>View on Map</button>
@@ -97,13 +127,23 @@ export const RecordRun = () => {
   return (
     <div className="auth-container">
       <h2>Upload Run</h2>
-      <p style={{ marginBottom: '1rem', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+      <p
+        style={{ marginBottom: '1rem', color: 'var(--color-text-secondary)', textAlign: 'center' }}
+      >
         For Phase 4, you can upload raw GPS points manually.
       </p>
-      
+
       {error && <div className="error-message">{error}</div>}
-      
-      <button onClick={handleGenerateMock} type="button" style={{ marginBottom: '1rem', background: 'var(--color-bg-surface)', border: '1px solid var(--color-brand-primary)' }}>
+
+      <button
+        onClick={handleGenerateMock}
+        type="button"
+        style={{
+          marginBottom: '1rem',
+          background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-brand-primary)',
+        }}
+      >
         Auto-Generate Mock Points
       </button>
 

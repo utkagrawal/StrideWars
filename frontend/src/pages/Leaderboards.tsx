@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { getGlobalLeaderboard, getUserGlobalRank, getRegionalLeaderboard, LeaderboardEntry } from '../api/leaderboards';
+import {
+  getGlobalLeaderboard,
+  getUserGlobalRank,
+  getRegionalLeaderboard,
+  LeaderboardEntry,
+} from '../api/leaderboards';
 import { useAuth } from '../hooks/useAuth';
 import { formatArea } from '../utils/format';
 
@@ -8,7 +13,10 @@ export const Leaderboards = () => {
   const [activeTab, setActiveTab] = useState<'global' | 'regional'>('global');
   const [globalEntries, setGlobalEntries] = useState<LeaderboardEntry[]>([]);
   const [regionalEntries, setRegionalEntries] = useState<LeaderboardEntry[]>([]);
-  const [userRank, setUserRank] = useState<{ rank: number | null; areaSquareMeters: number } | null>(null);
+  const [userRank, setUserRank] = useState<{
+    rank: number | null;
+    areaSquareMeters: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [regionName, setRegionName] = useState<string | null>(null);
@@ -27,7 +35,7 @@ export const Leaderboards = () => {
       if (activeTab === 'global') {
         const [globalData, rankData] = await Promise.all([
           getGlobalLeaderboard(50),
-          getUserGlobalRank()
+          getUserGlobalRank(),
         ]);
         setGlobalEntries(globalData.entries);
         setUserRank(rankData);
@@ -57,7 +65,9 @@ export const Leaderboards = () => {
 
         const regionalData = await getRegionalLeaderboard(params);
         setRegionalEntries(regionalData.entries);
-        setRegionName(regionalData.regionName || (lat === undefined ? 'Unavailable' : 'Unknown Region'));
+        setRegionName(
+          regionalData.regionName || (lat === undefined ? 'Unavailable' : 'Unknown Region')
+        );
       }
     } catch (err) {
       setError('Failed to fetch leaderboard data');
@@ -77,9 +87,9 @@ export const Leaderboards = () => {
       </thead>
       <tbody>
         {entries.map((entry) => (
-          <tr 
-            key={entry.userId} 
-            style={{ 
+          <tr
+            key={entry.userId}
+            style={{
               borderBottom: '1px solid var(--color-bg-elevated)',
               background: entry.userId === user?.id ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
               fontWeight: entry.userId === user?.id ? 'bold' : 'normal',
@@ -87,17 +97,29 @@ export const Leaderboards = () => {
           >
             <td style={{ padding: '0.75rem 0.5rem' }}>#{entry.rank}</td>
             <td style={{ padding: '0.75rem 0.5rem' }}>
-              <a href={`/profile/${entry.userId}`} style={{ color: 'white', textDecoration: 'none' }}>
+              <a
+                href={`/profile/${entry.userId}`}
+                style={{ color: 'white', textDecoration: 'none' }}
+              >
                 {entry.username}
               </a>
-              {entry.userId === user?.id && <span style={{ marginLeft: '0.5rem', color: 'var(--color-brand-primary)' }}>(You)</span>}
+              {entry.userId === user?.id && (
+                <span style={{ marginLeft: '0.5rem', color: 'var(--color-brand-primary)' }}>
+                  (You)
+                </span>
+              )}
             </td>
-            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>{formatArea(entry.areaSquareMeters)}</td>
+            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
+              {formatArea(entry.areaSquareMeters)}
+            </td>
           </tr>
         ))}
         {entries.length === 0 && (
           <tr>
-            <td colSpan={3} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
+            <td
+              colSpan={3}
+              style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}
+            >
               No ground claimed yet. Claim your first piece of the map today!
             </td>
           </tr>
@@ -108,9 +130,12 @@ export const Leaderboards = () => {
 
   let targetDelta = null;
   if (userRank && userRank.rank && userRank.rank > 1) {
-    const target = globalEntries.find(e => e.rank === userRank.rank! - 1);
+    const target = globalEntries.find((e) => e.rank === userRank.rank! - 1);
     if (target) {
-      targetDelta = { rank: target.rank, diff: target.areaSquareMeters - userRank.areaSquareMeters };
+      targetDelta = {
+        rank: target.rank,
+        diff: target.areaSquareMeters - userRank.areaSquareMeters,
+      };
     }
   }
 
@@ -119,15 +144,21 @@ export const Leaderboards = () => {
       <h2 style={{ marginBottom: '2rem' }}>Leaderboards</h2>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-        <button 
+        <button
           onClick={() => setActiveTab('global')}
-          style={{ background: activeTab === 'global' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)' }}
+          style={{
+            background:
+              activeTab === 'global' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
+          }}
         >
           Global
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('regional')}
-          style={{ background: activeTab === 'regional' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)' }}
+          style={{
+            background:
+              activeTab === 'regional' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
+          }}
         >
           Regional {regionName ? `(${regionName})` : ''}
         </button>
@@ -136,20 +167,40 @@ export const Leaderboards = () => {
       {error && <div className="error-message">{error}</div>}
 
       {activeTab === 'global' && userRank && (
-        <div style={{ background: 'var(--color-bg-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div
+          style={{
+            background: 'var(--color-bg-elevated)',
+            padding: '1rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <div>
-            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Your Global Rank</h3>
+            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+              Your Global Rank
+            </h3>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
               {userRank.rank ? `#${userRank.rank}` : 'Unranked'}
             </div>
             {targetDelta && (
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-brand-primary)', marginTop: '0.25rem' }}>
+              <div
+                style={{
+                  fontSize: '0.85rem',
+                  color: 'var(--color-brand-primary)',
+                  marginTop: '0.25rem',
+                }}
+              >
                 Only {formatArea(targetDelta.diff)} to catch #{targetDelta.rank}!
               </div>
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Your Ground</h3>
+            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+              Your Ground
+            </h3>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
               {formatArea(userRank.areaSquareMeters)}
             </div>
@@ -160,7 +211,13 @@ export const Leaderboards = () => {
       {loading ? (
         <p>Loading rankings...</p>
       ) : (
-        <div style={{ background: 'var(--color-bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+        <div
+          style={{
+            background: 'var(--color-bg-surface)',
+            padding: '1rem',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           {activeTab === 'global' ? renderTable(globalEntries) : renderTable(regionalEntries)}
         </div>
       )}

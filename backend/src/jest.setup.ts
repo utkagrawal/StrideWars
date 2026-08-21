@@ -6,14 +6,18 @@ beforeAll(async () => {
 
   // Truncate all application tables to ensure isolated test runs per file
   if (pool) {
-    await pool.query(`
+    await pool
+      .query(
+        `
       TRUNCATE TABLE 
         jobs, notifications, follows, territory_captures, 
         territories, run_points, runs, users 
       RESTART IDENTITY CASCADE
-    `).catch(() => undefined);
+    `
+      )
+      .catch(() => undefined);
   }
-  
+
   if (redis) {
     await redis.flushdb();
   }

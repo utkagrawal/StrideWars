@@ -38,20 +38,25 @@ const NotificationBell = () => {
   }, [user]);
 
   return (
-    <Link to="/notifications" style={{ color: 'white', textDecoration: 'none', position: 'relative', fontSize: '1.2rem' }}>
+    <Link
+      to="/notifications"
+      style={{ color: 'white', textDecoration: 'none', position: 'relative', fontSize: '1.2rem' }}
+    >
       🔔
       {unreadCount > 0 && (
-        <span style={{
-          position: 'absolute',
-          top: '-8px',
-          right: '-10px',
-          background: 'red',
-          color: 'white',
-          borderRadius: '50%',
-          padding: '2px 6px',
-          fontSize: '0.7rem',
-          fontWeight: 'bold'
-        }}>
+        <span
+          style={{
+            position: 'absolute',
+            top: '-8px',
+            right: '-10px',
+            background: 'red',
+            color: 'white',
+            borderRadius: '50%',
+            padding: '2px 6px',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+          }}
+        >
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
@@ -70,25 +75,65 @@ const AppShell = () => {
 
   return (
     <div className="app-layout">
-      <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 2rem', alignItems: 'center' }}>
+      <header
+        className="app-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          padding: '1rem 2rem',
+          alignItems: 'center',
+        }}
+      >
         <h1 style={{ margin: 0 }}>
-          <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>StrideWars</Link>
+          <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>
+            StrideWars
+          </Link>
         </h1>
         {user ? (
           <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', fontWeight: 500 }}>
-            <Link to="/feed" style={{ color: 'white', textDecoration: 'none' }}>Feed</Link>
-            <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>Map</Link>
-            <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>Dashboard</Link>
-            <Link to="/runs" style={{ color: 'white', textDecoration: 'none' }}>Runs</Link>
-            <Link to="/runs/new" style={{ color: 'var(--color-brand-primary)', textDecoration: 'none' }}>+ Record</Link>
-            <Link to="/leaderboards" style={{ color: 'white', textDecoration: 'none' }}>Rankings</Link>
+            <Link to="/feed" style={{ color: 'white', textDecoration: 'none' }}>
+              Feed
+            </Link>
+            <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>
+              Map
+            </Link>
+            <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>
+              Dashboard
+            </Link>
+            <Link to="/runs" style={{ color: 'white', textDecoration: 'none' }}>
+              Runs
+            </Link>
+            <Link
+              to="/runs/new"
+              style={{ color: 'var(--color-brand-primary)', textDecoration: 'none' }}
+            >
+              + Record
+            </Link>
+            <Link to="/leaderboards" style={{ color: 'white', textDecoration: 'none' }}>
+              Rankings
+            </Link>
             <NotificationBell />
-            <Link to="/profile" style={{ color: 'white', textDecoration: 'none' }}>Profile</Link>
+            <Link to="/profile" style={{ color: 'white', textDecoration: 'none' }}>
+              Profile
+            </Link>
           </nav>
         ) : (
           <nav style={{ display: 'flex', gap: '1rem' }}>
-            <Link to="/login" style={{ color: 'white', textDecoration: 'none' }}>Log In</Link>
-            <Link to="/register" style={{ color: 'white', textDecoration: 'none', background: 'var(--color-brand-primary)', padding: '0.25rem 0.75rem', borderRadius: '4px' }}>Sign Up</Link>
+            <Link to="/login" style={{ color: 'white', textDecoration: 'none' }}>
+              Log In
+            </Link>
+            <Link
+              to="/register"
+              style={{
+                color: 'white',
+                textDecoration: 'none',
+                background: 'var(--color-brand-primary)',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '4px',
+              }}
+            >
+              Sign Up
+            </Link>
           </nav>
         )}
       </header>
@@ -125,7 +170,7 @@ function GlobalApiListeners() {
     const handleError = (e: any) => {
       addToast(e.detail?.message || 'An API error occurred', 'error');
     };
-    
+
     const handleUnauthorized = () => {
       logout();
       addToast('Your session has expired. Please log in again.', 'error');

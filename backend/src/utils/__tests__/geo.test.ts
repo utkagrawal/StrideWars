@@ -5,7 +5,7 @@ describe('Geo Utilities', () => {
     it('calculates the distance between two distinct points', () => {
       const p1 = { lat: 37.7749, lng: -122.4194 }; // SF
       const p2 = { lat: 34.0522, lng: -118.2437 }; // LA
-      
+
       const distance = calculateHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
       // Distance is roughly 559 km (559000 meters)
       expect(distance).toBeGreaterThan(550000);
@@ -34,7 +34,7 @@ describe('Geo Utilities', () => {
     it('removes points that are within the tolerance distance', () => {
       const path = [p1, p2, p3]; // p2 is on the straight line between p1 and p3
       const simplified = douglasPeucker(path, 10);
-      
+
       expect(simplified.length).toBe(2);
       expect(simplified[0]).toEqual(p1);
       expect(simplified[1]).toEqual(p3);
@@ -43,7 +43,7 @@ describe('Geo Utilities', () => {
     it('keeps points that deviate beyond the tolerance', () => {
       const path = [p1, p4, p5]; // p4 is a huge spike
       const simplified = douglasPeucker(path, 10); // 10 meters tolerance
-      
+
       expect(simplified.length).toBe(3);
       expect(simplified).toEqual(path);
     });
@@ -94,7 +94,7 @@ describe('Polygon Geometry Utilities', () => {
       const p3 = { lat: latDist, lng: lngDist };
       const p4 = { lat: 0, lng: lngDist };
       const p5 = { lat: 0, lng: 0 }; // Closed
-      
+
       const area = polygonArea([p1, p2, p3, p4, p5]);
       // Should be around (111.32^2) = ~12392 sq meters
       expect(area).toBeGreaterThan(12000);
@@ -108,7 +108,7 @@ describe('Polygon Geometry Utilities', () => {
       { lat: 10, lng: 0 },
       { lat: 10, lng: 10 },
       { lat: 0, lng: 10 },
-      { lat: 0, lng: 0 }
+      { lat: 0, lng: 0 },
     ];
 
     it('returns true for a point strictly inside', () => {
@@ -137,14 +137,14 @@ describe('Polygon Geometry Utilities', () => {
         { lat: 10, lng: 0 },
         { lat: 10, lng: 10 },
         { lat: 0, lng: 10 },
-        { lat: 0, lng: 0 }
+        { lat: 0, lng: 0 },
       ];
       const bbox = getPolygonBoundingBox(square);
       expect(bbox).toEqual({
         minLat: 0,
         maxLat: 10,
         minLng: 0,
-        maxLng: 10
+        maxLng: 10,
       });
     });
   });
@@ -169,13 +169,13 @@ describe('generateRoadLoop', () => {
         { type: 'node', id: 1, lat: 0.0, lon: 0.0 },
         { type: 'node', id: 2, lat: 0.001, lon: 0.001 },
         { type: 'node', id: 3, lat: 0.002, lon: 0.002 },
-        { type: 'way', id: 10, nodes: [1, 2, 3] }
-      ]
+        { type: 'way', id: 10, nodes: [1, 2, 3] },
+      ],
     };
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => mockOsmData
+      json: async () => mockOsmData,
     });
 
     const loop = await generateRoadLoop(0.0, 0.0, 100, 200);
@@ -186,7 +186,7 @@ describe('generateRoadLoop', () => {
   it('falls back to circular loop on Overpass API error', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
-      status: 429
+      status: 429,
     });
 
     const loop = await generateRoadLoop(0.0, 0.0, 100, 200);

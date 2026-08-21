@@ -15,11 +15,11 @@ import { generateRoadLoop, generateRandomLoop } from '../geo';
 const MOCK_OVERPASS_RESPONSE = {
   elements: [
     { type: 'node', id: 1, lat: 26.1878, lon: 91.6916 },
-    { type: 'node', id: 2, lat: 26.1880, lon: 91.6916 },
+    { type: 'node', id: 2, lat: 26.188, lon: 91.6916 },
     { type: 'node', id: 3, lat: 26.1882, lon: 91.6916 },
-    { type: 'node', id: 4, lat: 26.1882, lon: 91.6920 },
+    { type: 'node', id: 4, lat: 26.1882, lon: 91.692 },
     { type: 'node', id: 5, lat: 26.1882, lon: 91.6924 },
-    { type: 'node', id: 6, lat: 26.1880, lon: 91.6924 },
+    { type: 'node', id: 6, lat: 26.188, lon: 91.6924 },
     {
       type: 'way',
       id: 100,

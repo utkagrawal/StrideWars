@@ -8,17 +8,17 @@ const app = createApp();
 describe('Social Integration', () => {
   let u1Token: string;
   let u1Id: string;
-  
+
   let u2Token: string;
   let u2Id: string;
 
   let u3Token: string;
   let u3Id: string;
-  
+
   beforeAll(async () => {
     await pool.query('DELETE FROM follows');
     await pool.query('DELETE FROM users WHERE email LIKE $1', ['%@socialtest.com']);
-    
+
     // User 1
     const r1 = await request(app).post('/api/auth/register').send({
       username: 'socuser1',
@@ -100,7 +100,7 @@ describe('Social Integration', () => {
       .post(`/api/social/follow/${u2Id}`)
       .set('Authorization', `Bearer ${u1Token}`)
       .expect(200);
-      
+
     // 1 follows 3
     await request(app)
       .post(`/api/social/follow/${u3Id}`)
@@ -110,26 +110,26 @@ describe('Social Integration', () => {
 
   it('returns a paginated activity feed merging runs and captures', async () => {
     // We need some activity from user 2 and user 3
-    
+
     // User 2 runs
     const points2 = [
-      { lat: 38.000, lng: -122.000, recordedAt: new Date(Date.now() - 13000).toISOString() },
-      { lat: 38.005, lng: -122.000, recordedAt: new Date(Date.now() - 12000).toISOString() },
+      { lat: 38.0, lng: -122.0, recordedAt: new Date(Date.now() - 13000).toISOString() },
+      { lat: 38.005, lng: -122.0, recordedAt: new Date(Date.now() - 12000).toISOString() },
       { lat: 38.005, lng: -122.005, recordedAt: new Date(Date.now() - 11000).toISOString() },
-      { lat: 38.000, lng: -122.005, recordedAt: new Date(Date.now() - 10000).toISOString() }
+      { lat: 38.0, lng: -122.005, recordedAt: new Date(Date.now() - 10000).toISOString() },
     ];
     await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u2Token}`)
       .send({ clientRunId: crypto.randomUUID(), startedAt: points2[0].recordedAt, points: points2 })
       .expect(201);
-      
+
     // User 3 runs
     const points3 = [
-      { lat: 39.000, lng: -122.000, recordedAt: new Date(Date.now() - 8000).toISOString() },
-      { lat: 39.005, lng: -122.000, recordedAt: new Date(Date.now() - 7000).toISOString() },
+      { lat: 39.0, lng: -122.0, recordedAt: new Date(Date.now() - 8000).toISOString() },
+      { lat: 39.005, lng: -122.0, recordedAt: new Date(Date.now() - 7000).toISOString() },
       { lat: 39.005, lng: -122.005, recordedAt: new Date(Date.now() - 6000).toISOString() },
-      { lat: 39.000, lng: -122.005, recordedAt: new Date(Date.now() - 5000).toISOString() }
+      { lat: 39.0, lng: -122.005, recordedAt: new Date(Date.now() - 5000).toISOString() },
     ];
     await request(app)
       .post('/api/runs')
@@ -145,13 +145,13 @@ describe('Social Integration', () => {
 
     // Should have 4 items: 2 runs, 2 captures (one for each run)
     expect(resFeed.body.items.length).toBeGreaterThanOrEqual(4);
-    
+
     // Items should be sorted in descending order of timestamp
     const times = resFeed.body.items.map((i: any) => new Date(i.timestamp).getTime());
     for (let i = 0; i < times.length - 1; i++) {
       expect(times[i]).toBeGreaterThanOrEqual(times[i + 1]);
     }
-    
+
     // Validate shape
     expect(resFeed.body.items[0]).toHaveProperty('type');
     expect(resFeed.body.items[0]).toHaveProperty('username');

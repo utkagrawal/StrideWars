@@ -35,7 +35,11 @@ export async function createRun(
   clientRunId: string,
   startedAt: string,
   points: RunPointInput[]
-): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[]; enclosedAreaSquareMeters: number }> {
+): Promise<{
+  run: Run;
+  capturedTerritories: { geohash: string; previousOwnerId: string | null }[];
+  enclosedAreaSquareMeters: number;
+}> {
   // Sort points by recordedAt just in case they arrived out of order
   const sortedPoints = [...points].sort(
     (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
@@ -43,18 +47,20 @@ export async function createRun(
 
   // Calculate stats
   const distanceMeters = calculateTotalDistance(sortedPoints);
-  
+
   const startTime = new Date(startedAt).getTime();
   const endTime = new Date(sortedPoints[sortedPoints.length - 1].recordedAt).getTime();
   const durationSeconds = Math.max(0, Math.floor((endTime - startTime) / 1000));
-  
+
   const avgPace = calculatePace(distanceMeters, durationSeconds);
 
   // Spoofing / Abuse Protection (Phase 5)
   // World record marathon pace is ~175 sec/km. Usain Bolt's top sprint is ~58 sec/km.
   // If the average pace is faster than 90 sec/km (40km/h) over a distance > 200m, reject it.
   if (distanceMeters > 200 && avgPace !== null && avgPace < 90) {
-    const error = new Error('Run rejected: Average pace is physically impossible on foot. Please turn off your car or GPS spoofer.');
+    const error = new Error(
+      'Run rejected: Average pace is physically impossible on foot. Please turn off your car or GPS spoofer.'
+    );
     (error as any).statusCode = 422;
     (error as any).code = 'VALIDATION_ERROR';
     throw error;
@@ -62,7 +68,7 @@ export async function createRun(
 
   const closedPoints = autoClosePath(sortedPoints, 30);
   const enclosedAreaSquareMeters = polygonArea(closedPoints);
-  
+
   if (enclosedAreaSquareMeters > 5000000) {
     const error = new Error('Enclosed area exceeds maximum allowed (5 sq km)');
     (error as any).statusCode = 422;
@@ -76,7 +82,7 @@ export async function createRun(
   }
 
   const result = await withTransaction(async (client) => {
-    // 1. Try to insert the run. 
+    // 1. Try to insert the run.
     // Uses ON CONFLICT DO NOTHING to handle idempotency via the UNIQUE(user_id, client_run_id) constraint.
     const pathPolygonJson = JSON.stringify(closedPoints);
     const { rows: runRows } = await client.query(
@@ -119,19 +125,23 @@ export async function createRun(
 
     // 4. Capture Territories
     const capturedTerritories: { geohash: string; previousOwnerId: string | null }[] = [];
-    
+
     for (const hash of uniqueHashes) {
       const { lat, lng } = decodeGeohash(hash);
 
       // 1. Ensure the row exists idempotently to avoid UPSERT race conditions
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO territories (geohash, owner_id, captured_at, center_lat, center_lng, captured_run_id)
         VALUES ($1, NULL, NOW(), $2, $3, NULL)
         ON CONFLICT (geohash) DO NOTHING
-      `, [hash, lat, lng]);
+      `,
+        [hash, lat, lng]
+      );
 
       // 2. Lock the row, read previous owner, and update
-      const res = await client.query(`
+      const res = await client.query(
+        `
         WITH old_terr AS (
           SELECT owner_id as previous_owner_id, id as territory_id
           FROM territories
@@ -147,11 +157,13 @@ export async function createRun(
           o.territory_id,
           o.previous_owner_id
         FROM old_terr o
-      `, [hash, userId, run.id]);
+      `,
+        [hash, userId, run.id]
+      );
 
       const previousOwnerId = res.rows[0]?.previous_owner_id || null;
       const territoryId = res.rows[0].territory_id;
-      
+
       console.log('CAPTURE DEBUG:', res.rows[0]);
 
       // Log the capture history
@@ -161,23 +173,20 @@ export async function createRun(
       );
 
       capturedTerritories.push({ geohash: hash, previousOwnerId });
-      
+
       console.log('CHECKING IF JOB SHOULD ENQUEUE:', { previousOwnerId, userId });
 
       if (previousOwnerId && previousOwnerId !== userId) {
         console.log('ENQUEUEING JOB for', hash);
         // Enqueue a job to send a notification to the previous owner
-        await client.query(
-          `INSERT INTO jobs (type, payload) VALUES ($1, $2)`,
-          [
-            'territory_lost_notification',
-            {
-              previousOwnerId,
-              newOwnerId: userId,
-              geohash: hash,
-            }
-          ]
-        );
+        await client.query(`INSERT INTO jobs (type, payload) VALUES ($1, $2)`, [
+          'territory_lost_notification',
+          {
+            previousOwnerId,
+            newOwnerId: userId,
+            geohash: hash,
+          },
+        ]);
         const { rows: debugJobs } = await client.query('SELECT * FROM jobs');
         console.log('JOBS INSIDE TX:', debugJobs);
       }
@@ -186,18 +195,18 @@ export async function createRun(
     return { run, capturedTerritories, enclosedAreaSquareMeters };
   });
 
-  // Post-commit: Sync scores to Redis. 
+  // Post-commit: Sync scores to Redis.
   // We fire-and-forget this after the Postgres transaction is fully committed.
   // We map the array to the expected shape.
-  const captureEvents = result.capturedTerritories.map(t => ({
+  const captureEvents = result.capturedTerritories.map((t) => ({
     geohash: t.geohash,
     previousOwnerId: t.previousOwnerId,
     newOwnerId: userId,
   }));
-  
+
   if (captureEvents.length > 0) {
     // Imported dynamically to avoid circular dependencies if any, or just import at top
-    updateScores(captureEvents).catch(err => {
+    updateScores(captureEvents).catch((err) => {
       // Already caught in updateScores, but just in case
       console.error('Failed post-commit score update:', err);
     });
@@ -213,7 +222,7 @@ export async function getRuns(
 ): Promise<{ runs: Run[]; nextCursor: string | null }> {
   let query = `SELECT * FROM runs WHERE user_id = $1`;
   const params: any[] = [userId];
-  
+
   if (cursor) {
     query += ` AND created_at < $2`;
     params.push(cursor);
@@ -224,13 +233,13 @@ export async function getRuns(
   params.push(limit + 1);
 
   const { rows } = await pool.query(query, params);
-  
+
   let nextCursor: string | null = null;
   if (rows.length > limit) {
     const nextRow = rows.pop(); // Remove the extra row
     nextCursor = nextRow.created_at.toISOString();
   }
-  
+
   return { runs: rows as Run[], nextCursor };
 }
 
@@ -244,11 +253,16 @@ export async function getRunById(
   runId: string,
   simplify: boolean = true,
   tolerance: number = 5
-): Promise<{ run: Run; points: RunPoint[]; pointCount: number; simplifiedPointCount: number } | null> {
-  const { rows: runRows } = await pool.query(
-    `SELECT * FROM runs WHERE id = $1 AND user_id = $2`,
-    [runId, userId]
-  );
+): Promise<{
+  run: Run;
+  points: RunPoint[];
+  pointCount: number;
+  simplifiedPointCount: number;
+} | null> {
+  const { rows: runRows } = await pool.query(`SELECT * FROM runs WHERE id = $1 AND user_id = $2`, [
+    runId,
+    userId,
+  ]);
 
   if (runRows.length === 0) {
     return null;

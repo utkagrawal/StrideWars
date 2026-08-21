@@ -117,7 +117,11 @@ export async function refresh(req: Request, res: Response): Promise<void | Respo
   }
 }
 
-export async function logout(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+export async function logout(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void | Response> {
   try {
     const refreshToken = req.cookies.refreshToken as string | undefined;
     if (refreshToken) {
@@ -130,7 +134,7 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
         // Ignore invalid token on logout
       }
     }
-    
+
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: isProduction,

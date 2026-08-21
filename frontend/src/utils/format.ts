@@ -5,7 +5,7 @@
  */
 export function formatArea(sqMeters: number): string {
   if (sqMeters == null) return '0 m²';
-  
+
   if (sqMeters < 10000) {
     return `${Math.round(sqMeters).toLocaleString('en-US')} m²`;
   } else {

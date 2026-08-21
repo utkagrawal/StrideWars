@@ -15,16 +15,13 @@ router.get(
   '/',
   [
     query('cursor').optional().isISO8601().withMessage('Valid cursor required'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100')
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
   ],
   validate,
   asyncHandler(getNotifications)
 );
 
-router.get(
-  '/unread-count',
-  asyncHandler(getUnreadCount)
-);
+router.get('/unread-count', asyncHandler(getUnreadCount));
 
 router.patch(
   '/:id/read',

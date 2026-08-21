@@ -30,7 +30,11 @@ export const createRun = async (
   clientRunId: string,
   startedAt: string,
   points: PointInput[]
-): Promise<{ run: Run; capturedTerritories: { geohash: string; previousOwnerId: string | null }[]; enclosedAreaSquareMeters: number }> => {
+): Promise<{
+  run: Run;
+  capturedTerritories: { geohash: string; previousOwnerId: string | null }[];
+  enclosedAreaSquareMeters: number;
+}> => {
   const { data } = await api.post('/runs', {
     clientRunId,
     startedAt,
@@ -39,7 +43,10 @@ export const createRun = async (
   return data;
 };
 
-export const getRuns = async (cursor?: string, limit: number = 20): Promise<{ runs: Run[]; nextCursor: string | null }> => {
+export const getRuns = async (
+  cursor?: string,
+  limit: number = 20
+): Promise<{ runs: Run[]; nextCursor: string | null }> => {
   const params = new URLSearchParams();
   if (cursor) params.append('cursor', cursor);
   params.append('limit', limit.toString());
@@ -48,7 +55,10 @@ export const getRuns = async (cursor?: string, limit: number = 20): Promise<{ ru
   return data;
 };
 
-export const getRunById = async (id: string, simplify: boolean = true): Promise<{ run: Run; points: RunPoint[]; pointCount: number; simplifiedPointCount: number }> => {
+export const getRunById = async (
+  id: string,
+  simplify: boolean = true
+): Promise<{ run: Run; points: RunPoint[]; pointCount: number; simplifiedPointCount: number }> => {
   const { data } = await api.get(`/runs/${id}?simplify=${simplify}`);
   return data;
 };

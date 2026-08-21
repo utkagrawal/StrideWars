@@ -27,27 +27,30 @@ describe('Leaderboards Service (Unit)', () => {
       exec: jest.fn().mockResolvedValue(true),
     };
     (redis.pipeline as jest.Mock).mockReturnValue(pipelineMock);
-    
+
     // Mock user territories
     // Two adjacent cells for user1: '9q8yyk8' and '9q8yyk9'
     (pool.query as jest.Mock).mockResolvedValue({
-      rows: [
-        { geohash: '9q8yyk8' },
-        { geohash: '9q8yyk9' }
-      ]
+      rows: [{ geohash: '9q8yyk8' }, { geohash: '9q8yyk9' }],
     });
 
-    await updateScores([
-      { geohash: '9q8yyk8', previousOwnerId: null, newOwnerId: 'user1' }
-    ]);
+    await updateScores([{ geohash: '9q8yyk8', previousOwnerId: null, newOwnerId: 'user1' }]);
 
     // Should call pool.query once for the user
     expect(pool.query).toHaveBeenCalledWith(expect.any(String), ['user1']);
-    
+
     // Should use ZADD
-    expect(pipelineMock.zadd).toHaveBeenCalledWith('leaderboard:region:9q8', expect.any(Number), 'user1');
-    expect(pipelineMock.zadd).toHaveBeenCalledWith('leaderboard:global', expect.any(Number), 'user1');
-    
+    expect(pipelineMock.zadd).toHaveBeenCalledWith(
+      'leaderboard:region:9q8',
+      expect.any(Number),
+      'user1'
+    );
+    expect(pipelineMock.zadd).toHaveBeenCalledWith(
+      'leaderboard:global',
+      expect.any(Number),
+      'user1'
+    );
+
     expect(pipelineMock.exec).toHaveBeenCalled();
   });
 
@@ -67,17 +70,23 @@ describe('Leaderboards Service (Unit)', () => {
       return Promise.resolve({ rows: [] });
     });
 
-    await updateScores([
-      { geohash: '9q8yyk8', previousOwnerId: 'user1', newOwnerId: 'user2' }
-    ]);
+    await updateScores([{ geohash: '9q8yyk8', previousOwnerId: 'user1', newOwnerId: 'user2' }]);
 
     // user1 should be ZREMed from region and global
     expect(pipelineMock.zrem).toHaveBeenCalledWith('leaderboard:region:9q8', 'user1');
     expect(pipelineMock.zrem).toHaveBeenCalledWith('leaderboard:global', 'user1');
-    
+
     // user2 should be ZADDed
-    expect(pipelineMock.zadd).toHaveBeenCalledWith('leaderboard:region:9q8', expect.any(Number), 'user2');
-    expect(pipelineMock.zadd).toHaveBeenCalledWith('leaderboard:global', expect.any(Number), 'user2');
+    expect(pipelineMock.zadd).toHaveBeenCalledWith(
+      'leaderboard:region:9q8',
+      expect.any(Number),
+      'user2'
+    );
+    expect(pipelineMock.zadd).toHaveBeenCalledWith(
+      'leaderboard:global',
+      expect.any(Number),
+      'user2'
+    );
 
     expect(pipelineMock.exec).toHaveBeenCalled();
   });

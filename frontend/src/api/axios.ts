@@ -31,23 +31,30 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Do not intercept 401s for login or refresh endpoints
-    if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+    if (
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh')
+    ) {
       if (error.response?.status === 429) {
         const retryAfter = error.response.headers['retry-after'] || 'a few';
-        window.dispatchEvent(new CustomEvent('api-error', { 
-          detail: { message: `Too many requests. Please try again in ${retryAfter} seconds.` } 
-        }));
+        window.dispatchEvent(
+          new CustomEvent('api-error', {
+            detail: { message: `Too many requests. Please try again in ${retryAfter} seconds.` },
+          })
+        );
       }
       return Promise.reject(error);
     }
 
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after'] || 'a few';
-      window.dispatchEvent(new CustomEvent('api-error', { 
-        detail: { message: `Too many requests. Please try again in ${retryAfter} seconds.` } 
-      }));
+      window.dispatchEvent(
+        new CustomEvent('api-error', {
+          detail: { message: `Too many requests. Please try again in ${retryAfter} seconds.` },
+        })
+      );
       return Promise.reject(error);
     }
 
@@ -57,11 +64,7 @@ api.interceptors.response.use(
 
       try {
         // Attempt to hit the refresh endpoint. The httpOnly cookie is sent automatically because of withCredentials
-        const { data } = await axios.post(
-          `${API_URL}/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
+        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
 
         // Update the access token in memory
         setAccessToken(data.accessToken);

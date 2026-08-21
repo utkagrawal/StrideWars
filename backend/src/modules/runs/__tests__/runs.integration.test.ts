@@ -10,19 +10,23 @@ describe('Runs Integration', () => {
 
   beforeAll(async () => {
     // Clear out test data
-    await pool.query('DELETE FROM run_points WHERE run_id IN (SELECT id FROM runs WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1))', ['%@runs.test.com']);
-    await pool.query('DELETE FROM runs WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)', ['%@runs.test.com']);
+    await pool.query(
+      'DELETE FROM run_points WHERE run_id IN (SELECT id FROM runs WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1))',
+      ['%@runs.test.com']
+    );
+    await pool.query(
+      'DELETE FROM runs WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
+      ['%@runs.test.com']
+    );
     await pool.query('DELETE FROM users WHERE email LIKE $1', ['%@runs.test.com']);
-    
+
     // Register test user
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'runstester',
-        email: 'user@runs.test.com',
-        password: 'password123',
-      });
-    
+    const res = await request(app).post('/api/auth/register').send({
+      username: 'runstester',
+      email: 'user@runs.test.com',
+      password: 'password123',
+    });
+
     token = res.body.accessToken;
     userId = res.body.user.id;
   });
@@ -59,7 +63,7 @@ describe('Runs Integration', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ clientRunId: 'not-a-uuid', startedAt, points })
         .expect(400);
-      
+
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
@@ -77,7 +81,7 @@ describe('Runs Integration', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ clientRunId, startedAt, points })
         .expect(201);
-      
+
       expect(res.body.run.client_run_id).toBe(clientRunId);
       expect(res.body.run.user_id).toBe(userId);
       expect(parseFloat(res.body.run.distance_meters)).toBeGreaterThan(0);
@@ -91,11 +95,13 @@ describe('Runs Integration', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ clientRunId, startedAt, points })
         .expect(201);
-      
+
       expect(res.body.run.client_run_id).toBe(clientRunId);
-      
+
       // Ensure only 1 run was actually created for this user
-      const { rows } = await pool.query('SELECT count(*) FROM runs WHERE client_run_id = $1', [clientRunId]);
+      const { rows } = await pool.query('SELECT count(*) FROM runs WHERE client_run_id = $1', [
+        clientRunId,
+      ]);
       expect(parseInt(rows[0].count)).toBe(1);
     });
   });
@@ -106,7 +112,7 @@ describe('Runs Integration', () => {
         .get('/api/runs?limit=10')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(Array.isArray(res.body.runs)).toBe(true);
       expect(res.body.runs.length).toBeGreaterThan(0);
       // nextCursor should be null since we only have 1 run
@@ -116,7 +122,7 @@ describe('Runs Integration', () => {
 
   describe('GET /api/runs/:id', () => {
     let runId: string;
-    let denseClientRunId = 'd9b9c9f9-e9a9-49c9-b9d9-c9a9e9f9c9b9';
+    const denseClientRunId = 'd9b9c9f9-e9a9-49c9-b9d9-c9a9e9f9c9b9';
 
     beforeAll(async () => {
       // Create a massive run to test simplification
@@ -124,18 +130,22 @@ describe('Runs Integration', () => {
       const baseDate = new Date().getTime();
       for (let i = 0; i < 100; i++) {
         densePoints.push({
-          lat: 37.7 + (i * 0.0001), // Basically a straight line
-          lng: -122.4 + (i * 0.0001),
-          recordedAt: new Date(baseDate + i * 1000).toISOString()
+          lat: 37.7 + i * 0.0001, // Basically a straight line
+          lng: -122.4 + i * 0.0001,
+          recordedAt: new Date(baseDate + i * 1000).toISOString(),
         });
       }
-      
+
       const res = await request(app)
         .post('/api/runs')
         .set('Authorization', `Bearer ${token}`)
-        .send({ clientRunId: denseClientRunId, startedAt: densePoints[0].recordedAt, points: densePoints })
+        .send({
+          clientRunId: denseClientRunId,
+          startedAt: densePoints[0].recordedAt,
+          points: densePoints,
+        })
         .expect(201);
-      
+
       runId = res.body.run.id;
     });
 
@@ -144,7 +154,7 @@ describe('Runs Integration', () => {
         .get(`/api/runs/${runId}?simplify=false`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(res.body.run.id).toBe(runId);
       expect(res.body.pointCount).toBe(100);
       expect(res.body.simplifiedPointCount).toBe(100);
@@ -156,7 +166,7 @@ describe('Runs Integration', () => {
         .get(`/api/runs/${runId}?simplify=true&tolerance=5`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(res.body.run.id).toBe(runId);
       expect(res.body.pointCount).toBe(100);
       // Since it's a perfectly straight line, DP should reduce it to just 2 points!

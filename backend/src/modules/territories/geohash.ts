@@ -11,7 +11,11 @@ export interface Coordinates {
  * Encodes a latitude and longitude into a geohash string.
  * Uses precision 7 by default for ~150m x 150m map cells.
  */
-export function encodeGeohash(lat: number, lng: number, precision: number = GEOHASH_PRECISION): string {
+export function encodeGeohash(
+  lat: number,
+  lng: number,
+  precision: number = GEOHASH_PRECISION
+): string {
   return ngeohash.encode(lat, lng, precision);
 }
 
@@ -50,8 +54,14 @@ export function computeIntersectingGeohashes(
   if (closedPoints.length < 4) return [];
 
   const bbox = getPolygonBoundingBox(closedPoints);
-  const candidateHashes = getGeohashesInBbox(bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng, precision);
-  
+  const candidateHashes = getGeohashesInBbox(
+    bbox.minLat,
+    bbox.minLng,
+    bbox.maxLat,
+    bbox.maxLng,
+    precision
+  );
+
   const insideHashes: string[] = [];
   for (const hash of candidateHashes) {
     const center = decodeGeohash(hash);
@@ -59,7 +69,7 @@ export function computeIntersectingGeohashes(
       insideHashes.push(hash);
     }
   }
-  
+
   // Sort lexicographically to prevent deadlocks!
   insideHashes.sort();
   return insideHashes;

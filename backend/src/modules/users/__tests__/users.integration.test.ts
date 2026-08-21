@@ -10,13 +10,11 @@ describe('Users Integration', () => {
 
   beforeAll(async () => {
     await pool.query('DELETE FROM users WHERE email LIKE $1', ['%@test.com']);
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'userstest',
-        email: 'users@test.com',
-        password: 'password123',
-      });
+    const res = await request(app).post('/api/auth/register').send({
+      username: 'userstest',
+      email: 'users@test.com',
+      password: 'password123',
+    });
     token = res.body.accessToken;
     userId = res.body.user.id;
   });

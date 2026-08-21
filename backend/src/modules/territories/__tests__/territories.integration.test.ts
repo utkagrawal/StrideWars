@@ -10,14 +10,12 @@ describe('Territories API Integration', () => {
   let userId: string;
 
   beforeAll(async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'terrtester',
-        email: 'user@terrs.test.com',
-        password: 'password123',
-      });
-    
+    const res = await request(app).post('/api/auth/register').send({
+      username: 'terrtester',
+      email: 'user@terrs.test.com',
+      password: 'password123',
+    });
+
     token = res.body.accessToken;
     userId = res.body.user.id;
   });
@@ -28,7 +26,7 @@ describe('Territories API Integration', () => {
     beforeAll(async () => {
       // Insert a mock territory for this user
       const lat = 40.7128; // NYC
-      const lng = -74.0060;
+      const lng = -74.006;
       testGeohash = encodeGeohash(lat, lng);
 
       await pool.query(
@@ -60,7 +58,7 @@ describe('Territories API Integration', () => {
         .get('/api/territories?bbox=0,0,1,1') // Far away from NYC
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(Array.isArray(res.body.territories)).toBe(true);
       expect(res.body.territories.length).toBe(0);
     });
@@ -76,9 +74,9 @@ describe('Territories API Integration', () => {
         .get(`/api/territories?bbox=${minLat},${minLng},${maxLat},${maxLng}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(Array.isArray(res.body.territories)).toBe(true);
-      
+
       const territory = res.body.territories.find((t: any) => t.geohash === testGeohash);
       expect(territory).toBeDefined();
       expect(territory.owner_username).toBe('terrtester');
@@ -96,12 +94,12 @@ describe('Territories API Integration', () => {
     });
 
     it('returns the territory when it exists', async () => {
-      const testGeohash = encodeGeohash(40.7128, -74.0060);
+      const testGeohash = encodeGeohash(40.7128, -74.006);
       const res = await request(app)
         .get(`/api/territories/${testGeohash}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      
+
       expect(res.body.territory).toBeDefined();
       expect(res.body.territory.geohash).toBe(testGeohash);
       expect(res.body.territory.owner_username).toBe('terrtester');

@@ -21,10 +21,7 @@ describe('Auth Integration', () => {
 
   describe('POST /api/auth/register', () => {
     it('successfully registers a new user', async () => {
-      const res = await request(app)
-        .post('/api/auth/register')
-        .send(testUser)
-        .expect(201);
+      const res = await request(app).post('/api/auth/register').send(testUser).expect(201);
 
       expect(res.body.user).toBeDefined();
       expect(res.body.user.username).toBe(testUser.username);
@@ -79,10 +76,7 @@ describe('Auth Integration', () => {
 
       const cookie = loginRes.headers['set-cookie'];
 
-      const res = await request(app)
-        .post('/api/auth/refresh')
-        .set('Cookie', cookie)
-        .expect(200);
+      const res = await request(app).post('/api/auth/refresh').set('Cookie', cookie).expect(200);
 
       expect(res.body.accessToken).toBeDefined();
     });
