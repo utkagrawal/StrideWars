@@ -1,5 +1,5 @@
 import { pool, withTransaction } from '../../config/db';
-import { calculateTotalDistance, calculatePace, autoClosePath, polygonArea, getPolygonBoundingBox, isPointInPolygon } from '../../utils/geo';
+import { calculateTotalDistance, calculatePace, autoClosePath, polygonArea } from '../../utils/geo';
 
 export interface RunPointInput {
   lat: number;
@@ -53,7 +53,7 @@ export async function createRun(
   // Spoofing / Abuse Protection (Phase 5)
   // World record marathon pace is ~175 sec/km. Usain Bolt's top sprint is ~58 sec/km.
   // If the average pace is faster than 90 sec/km (40km/h) over a distance > 200m, reject it.
-  if (distanceMeters > 200 && avgPace < 90) {
+  if (distanceMeters > 200 && avgPace !== null && avgPace < 90) {
     const error = new Error('Run rejected: Average pace is physically impossible on foot. Please turn off your car or GPS spoofer.');
     (error as any).statusCode = 422;
     (error as any).code = 'VALIDATION_ERROR';

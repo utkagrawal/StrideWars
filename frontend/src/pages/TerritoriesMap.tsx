@@ -507,8 +507,7 @@ export const TerritoriesMap = () => {
       <div style={{
         position: 'absolute',
         bottom: '30px',
-        left: '50%',
-        transform: 'translateX(-50%)',
+        left: '30px',
         zIndex: 1000,
         background: 'var(--color-bg-elevated)',
         padding: '1.5rem',
