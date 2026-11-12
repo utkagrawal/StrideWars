@@ -1,6 +1,5 @@
 # StrideWars Benchmark Results
 
-> **Status**: Compiled in Phase 3
 > **Conditions**: Benchmarks run against a local Docker-composed environment on a standard developer machine (Apple Silicon M-series equivalent), seeded with:
 > - 5,000 Users
 > - 50,000 Runs

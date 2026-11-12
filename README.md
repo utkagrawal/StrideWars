@@ -1,110 +1,116 @@
-# StrideWars 🏃‍♂️⚔️
-![CI Status](https://github.com/utkagrawal/StrideWars/actions/workflows/ci.yml/badge.svg) ![Coverage](https://img.shields.io/badge/Coverage-85%25-brightgreen.svg)
+# StrideWars
 
-**A competitive running platform where you capture geographic territories by running through them and battle for supremacy on global leaderboards.**
+![CI Status](https://github.com/utkagrawal/StrideWars/actions/workflows/ci.yml/badge.svg)
 
-**[🔴 Live Demo (Render Free Tier)](https://stridewars.onrender.com)**
+StrideWars is a territory game for runners. You run a loop, and every bit of the map inside that loop becomes yours. If your loop cuts through someone else's ground, you take it from them, they get an alert, and the leaderboard shifts.
 
-*I built StrideWars to showcase my ability to design and implement a complex, concurrency-safe modular monolith. It demonstrates hands-on experience with geospatial data, deterministic database locking for highly contested writes, and O(log N) Redis-backed real-time leaderboards, all profiled and optimized for scale.*
+I built it to work on the backend problems that show up once lots of people write to the same data at the same time: two runners claiming the same streets in the same second, alerts that must only go out if a capture actually happened, and rankings that stay fast as the number of players grows.
 
----
+![Capturing ground on the map](docs/assets/capture.png)
 
-## Project Overview
+## How the game works
 
-StrideWars is a full-stack, map-based application that gamifies running. By uploading GPS tracks of their runs, users compute the geographic bounding boxes they intersected and claim them as their own. When users intersect a territory owned by someone else, they steal it!
+The map is split into a grid of small cells, about 34 × 19 m each (geohash precision 8). When you finish a run, the route is closed into a loop and every cell whose centre falls inside it is assigned to you. Cells keep their owner until someone else runs a loop around them.
 
-## Features
+There are three ways to get a loop in:
 
-- **Authentication**: JWT-based secure user registration and login with robust server-side revocation.
-- **Run Tracking**: Upload GPS run data and visualize routes using Douglas-Peucker simplification on an interactive Leaflet map.
-- **Territory Capture**: Automatically compute geohash cells intersected by your run and claim them using deterministic database locks to ensure concurrency safety.
-- **Global Leaderboards**: Live `O(log N)` leaderboard rankings backed by Redis Sorted Sets based on territory ownership.
-- **Social Feed**: Follow other runners and see a merged, keyset-paginated feed of their recent runs and territory captures.
-- **Background Notifications**: Get notified asynchronously when someone steals your territory, powered by a custom PostgreSQL background worker using `FOR UPDATE SKIP LOCKED`.
-- **Interactive Map Landing**: Immediately jump into the action on login with a live map featuring a collapsible HUD containing your global rank, territory count, and alerts.
-- **Security Hardened**: Robust input validation with `express-validator`, resource ownership verification middleware, and Redis-backed fixed-window rate limiting.
-- **Production Ready**: Fully profiled with native `EXPLAIN ANALYZE`, caching protections against stampedes, connection pool tuning, and multi-stage Docker builds.
+- record a real run with your phone's GPS (the panel shows the latest fixes live, one every 2 seconds)
+- draw a route on the map by clicking waypoints
+- generate a quick loop that follows nearby roads from OpenStreetMap
 
-### Phases
-- [x] Phase 19: Narrative Arc & UX Polish
-- [x] Phase 20: Map Centering, Real Polygons, and Demo Seeding
-- [x] Phase 21: Realistic Loop Generation & Map UX Polish
+Players are ranked by how much area they currently own, globally and per region. You can follow other runners and see their runs in a feed. Each runner keeps the same colour everywhere in the app, and lime is always you.
 
-## Tech Stack
+There are some basic anti-cheat checks: a run with an average pace faster than 90 s/km (car speed) or a loop larger than 5 km² is rejected.
 
-| Layer | Technology | Rationale |
+| Landing | GPS recording | Leaderboard |
 |---|---|---|
-| **Frontend** | React 18, TypeScript, Vite | Fast, typed SPA experience with Leaflet for geospatial visualization. |
-| **Backend** | Node.js, Express, TypeScript | Lightweight asynchronous I/O perfect for high-throughput API endpoints. |
-| **Database** | PostgreSQL 16 (via `pg`) | Relational integrity for user data + powerful indexing for geospatial queries. |
-| **Cache / Queue** | Redis 7 (via `ioredis`) | Blazing fast `O(log N)` Sorted Sets for leaderboards and Pub/Sub for rate limiting. |
-| **Infrastructure** | Docker, Docker Compose | Consistent environments across development, testing, and production. |
+| ![Landing page](docs/assets/landing.png) | ![Recording with live GPS fixes](docs/assets/gps.png) | ![Leaderboard](docs/assets/leaderboard.png) |
 
-### Architecture
+## Stack
 
-**Modular Monolith**: A single Express application internally split into domain modules:
-`auth`, `users`, `runs`, `territories`, `leaderboards`, `social`, `notifications`
+React 18 + TypeScript + Vite on the frontend, with Leaflet for maps and plain CSS. The backend is Node + Express + TypeScript, split into modules (auth, users, runs, territories, leaderboards, social, notifications), each with its own routes, controller and service. Postgres is the source of truth, Redis holds the leaderboards and rate limits, and a small worker process sends notifications. Everything runs locally with Docker Compose, and GitHub Actions runs lint, build and tests on every push.
 
-This structure allows us to move fast with a single deployment while maintaining the strict boundaries required to easily extract microservices in the future.
+## What happens when you finish a run
 
-See [`docs/architecture.md`](docs/architecture.md) for details.
+All of this lives in [`runs.service.ts`](backend/src/modules/runs/runs.service.ts):
 
----
-
-## Local Development & Setup
-
-> **Prerequisites**: Node.js ≥ 20, Docker Desktop running.
-
-We provide a one-click bootstrap script that brings up the entire stack, runs migrations, and seeds the database with 50,000 runs to demonstrate scale (and generates demo users with captured territories around IIT Guwahati).
-
-```bash
-# 1. Clone and install dependencies
-npm install
-
-# 2. Setup environment variables
-cp .env.example .env
-cp backend/.env.example backend/.env
-
-# 3. Bootstrap the entire environment
-npm run setup
+```
+POST /api/runs  { clientRunId, points[] }
+  1. validate      sort points by time, work out distance and pace, reject impossible pace
+  2. close loop    join the end back to the start if they're more than 30 m apart
+  3. find cells    geohash cells whose centre is inside the loop, sorted
+  4. transaction   insert the run (ignored if clientRunId was already uploaded)
+                   insert any cells that don't exist yet
+                   lock all of them in sorted order and read their previous owners
+                   hand them to the runner and log the capture history
+                   queue one "you lost ground" job per runner who lost cells
+  5. after commit  update the Redis leaderboard scores
 ```
 
-Once the setup script finishes, you can access the application:
-- **Frontend Map**: `http://localhost:5173`
-- **Backend API**: `http://localhost:3000/api`
+A few decisions in there that I think are worth explaining:
 
-### Infrastructure Commands
-- `docker compose up -d` — Start the full local stack (Postgres, Redis, Backend, Worker, Frontend).
-- `docker compose -f docker-compose.prod.yml up -d` — Start the production-optimized stack using multi-stage builds and Nginx.
-- `npm run infra:down` — Stop containers.
+- **Concurrent captures.** Each cell row is locked with `SELECT ... FOR UPDATE`, so if two runs overlap, one waits for the other and the last one to commit wins. Locks are always taken in sorted geohash order, so two transactions can't end up waiting on each other in a cycle. There's an integration test that fires three overlapping runs at once to check this.
+- **Big loops.** The capture used to run three queries per cell. With small cells that turned into thousands of queries for one run, so it's now four set-based statements (`unnest`, `ANY(...)`) regardless of size. A 400-cell capture takes about 25 ms.
+- **Retries.** Phones retry uploads on bad signal. Every run carries a client-generated UUID with a unique constraint on it, so a retried upload returns the original run and doesn't capture anything twice.
+- **Alerts.** The notification job is inserted in the same transaction as the capture, so it only exists if the capture committed. A separate worker picks jobs up with `FOR UPDATE SKIP LOCKED`, which lets several workers run without sending the same alert twice.
+- **Leaderboards.** Scores live in Redis sorted sets, so updating a score and looking up "my rank" are both O(log N). Postgres is still the source of truth, and `npm run db:reconcile` rebuilds Redis from it if the two ever drift. The top 50 is cached for 5 seconds so a burst of page loads costs one database query.
+- **Feed.** Paginated with a cursor on `created_at` instead of `OFFSET`, so page 50 is as cheap as page 1.
 
----
+There's more detail in [`docs/`](docs): [architecture](docs/architecture.md), [database and indexes](docs/database.md), [API](docs/api.md), [scalability](docs/scalability.md), [algorithms](docs/dsa.md) and a [decision log](docs/decisions.md).
 
-## Documentation
+## Project layout
 
-StrideWars was built with a strong emphasis on architectural documentation and evidence-based performance profiling.
+```
+backend/src/
+  app.ts, server.ts       Express setup and entry point
+  modules/<name>/         <name>.routes.ts -> <name>.controller.ts -> <name>.service.ts
+  worker/index.ts         background job processor
+  utils/geo.ts            haversine, polygon area, point-in-polygon, Douglas-Peucker
+  scripts/seed.ts         demo world: 7 runners around the IIT Guwahati campus
+  scripts/seed-scale.ts   5,000 users and 50,000 runs, for profiling
+frontend/src/
+  pages/                  one file per screen; MapPage is the main one
+  components/map/         territory layer, run panel, map overlays
+  api/                    small axios wrappers, one per backend module
+```
 
-- 🏗️ **[Architecture Overview](docs/architecture.md)**
-- 💾 **[Database Schema & Index Justifications](docs/database.md)**
-- 🔌 **[API Documentation](docs/api.md)**
-- 🚀 **[Scalability Path & Bottlenecks](docs/scalability.md)**
-- 🧮 **[Data Structures & Algorithms (DSA)](docs/dsa.md)**
-- 🏛️ **[Architectural Decision Records (ADRs)](docs/decisions.md)**
-- 🎓 **[Interview Preparation](docs/interview-prep.md)**
+## Running it locally
 
----
+You need Node 20 or newer and Docker Desktop.
 
-## Live Demo Walkthrough
+```bash
+npm install
+cp .env.example .env
+cp backend/.env.example backend/.env
+npm run setup    # starts the containers, runs migrations and seeds the demo world
+```
 
-*(Replace this placeholder with a 30-60s GIF/MP4 showing: login → live map → uploading a run → a territory being claimed/stolen → leaderboard updating)*
-![StrideWars Demo](docs/assets/demo-placeholder.gif)
+Then open http://localhost:5173 and click "Try the demo account" (or log in as `demo@stridewars.app` / `password123`). Every seeded runner uses the same password, so you can log in as `kabir@stridewars.app` in a private window and steal ground back and forth.
 
----
+<details>
+<summary>Without Docker (Postgres and Redis installed locally)</summary>
 
-## Future Improvements
+```bash
+# point DATABASE_URL and REDIS_URL in backend/.env at your local services
+npm run migrate:up --workspace=backend
+npm run db:seed --workspace=backend
+npm run dev:backend                      # API on :3001
+npm run worker:dev --workspace=backend   # sends the "you lost ground" alerts
+npm run dev:frontend                     # app on :5173, proxies /api to :3001
+```
+</details>
 
-As detailed in `docs/scalability.md`, the next logical steps for scaling the platform are:
-1. **CDN Caching**: Offload React bundles to Cloudflare.
-2. **Read Replicas**: Offload `GET /api/runs` and `GET /api/territories` to Postgres replicas.
-3. **~~PgBouncer~~** (Implemented Phase 5): Connection pooling allows horizontal scaling of the Node.js API pods.
-4. **BullMQ**: Migrate the background worker from Postgres `jobs` to a dedicated Redis queue.
+Other commands I use a lot:
+
+- `npm run db:seed --workspace=backend` resets everything to the demo world
+- `npm run db:seed:scale --workspace=backend` loads the large dataset used for profiling
+- `npm run db:reconcile --workspace=backend` rebuilds the leaderboards from Postgres
+- `npm test` and `npm run test:integration` run the backend tests (integration tests need Postgres and Redis)
+- `npm run test --workspace=frontend` runs the frontend tests
+
+## What I'd do next
+
+- Check speed between every pair of GPS points, not just the average, so a run that's half on foot and half in a car gets caught.
+- Push alerts over WebSockets instead of polling for the unread count.
+- Move the job queue to Redis (BullMQ) if job volume ever justifies it.
+- Send map and feed reads to a read replica, and keep captures on the primary.

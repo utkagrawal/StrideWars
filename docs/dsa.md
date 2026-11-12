@@ -1,7 +1,5 @@
 # Data Structures & Algorithms
 
-> **Status**: Finalized (Phase 15)
-
 ## Run Processing
 
 - **Distance Calculation (Haversine Formula)**
@@ -27,8 +25,8 @@
 - **Spatial Indexing (Geohashing)**
   - **Problem**: Given a GPS point or bounding box, we need to quickly identify which map cell (territory) it belongs to, or fetch all cells in the viewport, without scanning a massive database.
   - **Naive Approach**: Store a center `(lat, lng)` for every cell, and do a linear scan $O(n)$ checking distance: `WHERE distance(lat, lng) < radius`.
-  - **Optimized Approach**: Geohashing. We convert the 2D `(lat, lng)` into a 1D string (e.g., `9q8yyk8`). This creates a deterministic, bucketed grid. To query a bounding box, we compute the required geohashes locally and do an $O(1)$ indexed lookup: `WHERE geohash IN (...)`.
-  - **Complexity**: $O(1)$ average for string encoding/decoding, and $O(1)$ index lookup vs $O(n)$ linear scan.
+  - **Approach**: Geohashing. A `(lat, lng)` pair becomes a short string (e.g. `wh9hyqsu` at precision 8), which gives a fixed grid where every cell has a stable key. Ownership is one row per cell with a unique index on that key.
+  - **Complexity**: encoding a point is $O(p)$ for precision $p$ (effectively constant). Looking a cell up is a B-tree search, $O(\log n)$, instead of an $O(n)$ scan over every territory. The map viewport uses a range scan on an index over the cells' centre coordinates, $O(\log n + k)$ for $k$ cells returned.
   - **Why it matters**: A global map grid contains millions of cells. We only store claimed cells (lazy instantiation) and retrieve them instantly using B-tree indexing on the geohash string.
 
 - **Deduplication & Deterministic Lock Ordering**
@@ -61,8 +59,8 @@
   - **Problem**: Generating a social feed requires fetching recent events of *multiple* types (`runs` and `territory_captures`) from *multiple* users (everyone the current user follows), merged chronologically, and paginated efficiently.
   - **Naive Approach**: Fetching all events from all followed users into application memory and sorting them (`O(N log N)` where `N` is all events). Alternatively, performing N+1 queries.
   - **Optimized Approach**: The `getFeed` API uses a `UNION ALL` Common Table Expression (CTE). Postgres evaluates the `UNION ALL` across the two tables. Because we added composite indexes (`runs_user_id_created_at_idx` and `territory_captures_user_id_captured_at_idx`), Postgres can perform incredibly fast Index Scans to fetch the top `K` items per user, and then merge-sort them.
-  - **Cursor Pagination**: We use the timestamp as a cursor (`timestamp_val < $2`) rather than `OFFSET`. This provides `O(1)` jumping to the next page instead of $O(N)$ scanning, which is critical for infinite-scroll social feeds.
-  - **Phase 14 Validation**: `EXPLAIN ANALYZE` confirmed the theoretical complexity. The query executed in **1.7ms** across 50,000 runs, utilizing `Bitmap Index Scans` and a `top-N heapsort` memory sort, proving it never scans unnecessary depth.
+  - **Cursor Pagination**: The last item's timestamp is the cursor (`created_at < $2`) instead of `OFFSET`. Each page is an index seek plus the page itself, $O(\log n + k)$, no matter how deep you scroll. `OFFSET` has to walk past every skipped row, so it gets slower page by page.
+  - **Measured**: `EXPLAIN ANALYZE` confirmed the theoretical complexity. The query executed in **1.7ms** across 50,000 runs, utilizing `Bitmap Index Scans` and a `top-N heapsort` memory sort, proving it never scans unnecessary depth.
 
 ## Background Job Queue Concurrency
 
@@ -70,7 +68,7 @@
   - **Problem**: We need a background worker to process async jobs (like push notifications) from a `jobs` table. Running multiple instances of this worker risks double-processing a job if two instances query `SELECT ... status='pending'` at the exact same millisecond before either can `UPDATE` it to `processing`.
   - **Naive Approach**: `SELECT` the oldest job, then run an `UPDATE` in application code. This race condition leads to duplicate notifications.
   - **Optimized Approach**: `UPDATE jobs SET status='processing' WHERE id = (SELECT id FROM jobs WHERE status='pending' LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *`.
-  - **Why it matters**: `FOR UPDATE` locks the row from being modified by other transactions. `SKIP LOCKED` tells the database to instantly skip over any rows that are currently locked by other concurrent queries rather than waiting for the lock. This allows dozens of parallel worker pods to pull from the same Postgres table with zero contention and zero double-processing, completely eliminating the immediate need for a heavyweight message broker like RabbitMQ or BullMQ. This is the same class of lock-based concurrency control used in Phase 7 for territory captures.
+  - **Why it matters**: `FOR UPDATE` locks the row from being modified by other transactions. `SKIP LOCKED` tells the database to instantly skip over any rows that are currently locked by other concurrent queries rather than waiting for the lock. This allows dozens of parallel worker pods to pull from the same Postgres table with zero contention and zero double-processing, completely eliminating the immediate need for a heavyweight message broker like RabbitMQ or BullMQ. Territory captures use the same row locks, but without `SKIP LOCKED`: a capture must wait for the cell, not skip it.
 
 ## Rate Limiting
 
@@ -81,7 +79,7 @@
   - **Complexity**: $O(1)$ time complexity for both `INCR` and `EXPIRE`. Space complexity is $O(U)$ where $U$ is the number of unique active IPs in the current window.
   - **Why it matters**: A Redis-backed implementation guarantees centralized, atomic, and extremely fast rate limiting across a distributed fleet of API servers. Using `INCR` avoids race conditions inherent in `GET` -> `count++` -> `SET` patterns.
 
-## Cell Adjacency Grouping & Edge Tracing (Phase 20)
+## Cell Adjacency Grouping & Edge Tracing
 **Problem**: How to render hundreds of individual grid-square bounded boxes (geohashes) on the map as contiguous, organic polygons without importing a heavy spatial library like Turf.js.
 **Approach**: We use a two-step edge-cancellation algorithm:
 1. Decode each geohash into its 4 directed edges (CCW).
@@ -91,7 +89,7 @@
 
 **Complexity**: $O(N)$ where $N$ is the number of cells in the viewport, as hash map insertions, deletions, and edge traversals are all $O(1)$ operations per cell.
 
-## Road-Following Path Generation (Phase 21)
+## Road-Following Path Generation
 
 - **OSM Graph Random Walk**
   - **Problem**: Generating realistic simulated running loops for demonstration purposes. Pure mathematical circles cross over buildings and water, breaking realism.

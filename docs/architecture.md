@@ -1,10 +1,8 @@
 # Architecture
 
-> **Status**: Updated in Phase 1.5 — local dev environment section added.
-
 ## Overview
 
-StrideWars is a **modular monolith**: a single deployable Express application internally divided into bounded domain modules. Each module owns its routes, controller, service, and repository layer — enforcing separation of concerns without the operational overhead of microservices.
+StrideWars is a **modular monolith**: a single deployable Express application internally divided into bounded domain modules. Each module has its own routes, controller and service (`<module>.routes.ts`, `<module>.controller.ts`, `<module>.service.ts`), and modules only call each other through service functions. It's one thing to deploy, but the boundaries are clear enough to split out later.
 
 ## Module Boundaries
 
@@ -14,9 +12,9 @@ StrideWars is a **modular monolith**: a single deployable Express application in
 | `users` | User profile CRUD, settings |
 | `runs` | Run recording, GPS track storage |
 | `territories` | Geographic tile ownership & capture |
-| `leaderboards` | Ranking computation, point aggregation |
+| `leaderboards` | Area rankings in Redis sorted sets, global and per region |
 | `social` | Follow graph, activity feed |
-| `notifications` | In-app and push notification dispatch |
+| `notifications` | "You lost ground" alerts (created by the background worker) |
 
 ## Request Flow
 
@@ -24,15 +22,14 @@ StrideWars is a **modular monolith**: a single deployable Express application in
 Client → HTTP → Express Router
                   └── Module Router
                         └── Controller (HTTP parsing)
-                              └── Service (business logic)
-                                    └── Repository (DB / Redis)
+                              └── Service (business logic, SQL and Redis calls)
 ```
 
 ## Infrastructure
 
-- **PostgreSQL** — primary relational store
-- **Redis** — caching, leaderboard sorted sets, session store
-- **Docker Compose** — local dev orchestration (Postgres + Redis only)
+- **PostgreSQL**: primary relational store
+- **Redis**: leaderboard sorted sets, a short leaderboard cache, rate-limit counters
+- **Docker Compose**: `docker-compose.yml` runs the whole stack (Postgres, PgBouncer, Redis, API, worker, frontend); for day-to-day work I usually run only Postgres and Redis in Docker and the apps on the host, as below
 
 ## Local Development Environment
 
@@ -48,15 +45,16 @@ Client → HTTP → Express Router
 | Process | Location | Port | Why on host |
 |---|---|---|---|
 | Express backend | `backend/` | `3001` | Fast ts-node/nodemon reload; no Docker rebuild cycle during development |
-| React frontend | `frontend/` | `5173` | Vite HMR requires direct filesystem access |
+| Background worker | `backend/` | none | Turns queued jobs into "you lost ground" alerts (`npm run worker:dev`) |
+| React frontend | `frontend/` | `5173` | Vite HMR requires direct filesystem access; `/api` is proxied to `:3001` |
 
 ### Why this split?
 
 Keeping the backend and frontend on the host while only containerising stateful services gives the best developer experience:
 
-- **Sub-second reload** — nodemon + ts-node restarts in < 1 s; a Docker restart cycle takes 5–10 s
-- **Debugger attach** — `node --inspect` works trivially on the host; port-forwarding inside Docker adds friction
-- **Stateful services need isolation** — Postgres and Redis hold data that must persist across restarts and be version-pinned; running them locally risks version drift across machines
+- **Sub-second reload**: nodemon + ts-node restarts in < 1 s; a Docker restart cycle takes 5–10 s
+- **Debugger attach**: `node --inspect` works trivially on the host; port-forwarding inside Docker adds friction
+- **Stateful services need isolation**: Postgres and Redis hold data that must persist across restarts and be version-pinned; running them locally risks version drift across machines
 
 ### How to start everything
 
@@ -67,16 +65,17 @@ npm run infra:up
 # 2. Start backend (separate terminal)
 cd backend && npm run dev
 
-# 3. Start frontend (separate terminal)
+# 3. Start the worker (separate terminal)
+cd backend && npm run worker:dev
+
+# 4. Start frontend (separate terminal)
 cd frontend && npm run dev
 
-# 4. Verify
+# 5. Verify
 curl http://localhost:3001/api/health
 # → { "status": "ok", "db": "ok", "redis": "ok" }
 ```
 
 ### Apple Silicon / M-series note
 
-`postgres:16` and `redis:7` pull `arm64` variants automatically from Docker Hub when Docker Desktop is configured for Apple Silicon. No manual action is required. If you see `WARNING: The requested image's platform does not match the detected host platform`, your Docker installation is using x86 emulation — open Docker Desktop → Settings → General and ensure "Use Rosetta for x86/amd64 emulation" is **not** the only option selected, or reinstall Docker Desktop with the Apple Silicon package.
-
-_Detailed diagrams and sequence flows will be added in subsequent phases._
+`postgres:16` and `redis:7` pull `arm64` variants automatically from Docker Hub when Docker Desktop is configured for Apple Silicon. No manual action is required. If you see `WARNING: The requested image's platform does not match the detected host platform`, your Docker installation is using x86 emulation. Open Docker Desktop → Settings → General and ensure "Use Rosetta for x86/amd64 emulation" is **not** the only option selected, or reinstall Docker Desktop with the Apple Silicon package.

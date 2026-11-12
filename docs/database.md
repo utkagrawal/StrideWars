@@ -1,7 +1,5 @@
 # Database Schema & Migrations
 
-> **Status**: Updated in Phase 2
-
 ## Overview
 
 StrideWars uses **PostgreSQL 16** as the primary relational datastore. We deliberately use raw SQL migrations and `pg` for interactions to maintain granular control, optimize performance (especially for geospatial data), and deepen the team's understanding of the underlying database mechanics.
@@ -14,10 +12,10 @@ We use `node-pg-migrate` instead of an ORM (Prisma, Sequelize, TypeORM).
 
 1. **Learning Depth**: Writing SQL directly builds a deeper understanding of PostgreSQL features (like `TIMESTAMPTZ`, geospatial functions, `JSONB` indexing).
 2. **Predictable Performance**: ORMs often generate suboptimal queries (e.g., N+1 problems or complex joins). Raw SQL ensures we know exactly what is executing.
-3. **Advanced PostgreSQL Features**: Later phases will heavily utilize PostGIS for territory calculations, which are difficult to map cleanly in many ORMs.
+3. **Hand-written SQL where it matters**: the capture relies on `unnest`, `ON CONFLICT`, `FOR UPDATE` and `SKIP LOCKED`, which are clearer as plain SQL than through an ORM.
 4. **Reduced Abstraction Leaks**: When queries perform poorly, developers don't have to fight the ORM's syntax to optimize it.
 
-## Initial Schema (Phase 2)
+## Initial Schema
 
 ### `users`
 Core user identity and authentication.
@@ -103,7 +101,7 @@ Background tasks and asynchronous workers.
 - `created_at` (TIMESTAMPTZ, NOT NULL, default `now()`)
 - **Indexes**: `status` for fast polling of `'pending'` jobs.
 
-## EXPLAIN ANALYZE Profiling (Phase 14)
+## EXPLAIN ANALYZE Profiling
 
 Under a seeded dataset of 5,000 users, 50,000 runs, and 10,000 territory captures, we performed `EXPLAIN ANALYZE` on critical paths to empirically validate our indexing strategy. 
 
@@ -181,18 +179,20 @@ Execution Time: 0.045 ms
 
 ## Index Justifications
 
-Every index in StrideWars exists to solve a specific production query pattern:
+Each index is there for a specific query:
 
 1. **`users_pkey`**: Primary key. Hydrates Redis leaderboard payloads via `id = ANY(...)`.
 2. **`runs_user_id_created_at_idx`**: Supports `GET /api/runs` user history pagination and social feed CTE generation without a memory sort.
 3. **`run_points_run_id_seq_idx`**: Essential for returning an ordered track when fetching a specific run.
-4. **`territories_geohash_idx`**: Powers the map viewport `WHERE geohash = ANY(...)` spatial queries instantly.
-5. **`territories_owner_id_idx`**: Speeds up `GET /api/territories/mine` and full leaderboard recalcs without a full table scan.
-6. **`territory_captures_user_id_captured_at_idx`**: Same as runs — drives the CTE social feed generation for territory capture events.
-7. **`follows_pkey (follower_id, followee_id)`**: Backs the `GET /api/social/following` list and prevents duplicate follows.
-8. **`follows_followee_id_idx`**: The inverse of the pkey; powers the `GET /api/social/followers` list.
-9. **`notifications_user_id_unread_idx`**: A partial index (`WHERE read_at IS NULL`) making the global unread badge count essentially $O(1)$ regardless of historical notification volume.
-10. **`jobs_status_idx`**: Ensures the background worker `SELECT ... WHERE status='pending'` instantly finds the next job.
+4. **`territories_geohash_key`** (unique): one row per cell. The capture's `INSERT ... ON CONFLICT (geohash)` and `SELECT ... WHERE geohash = ANY(...) FOR UPDATE` both go through it.
+5. **`territories_center_idx (center_lat, center_lng)`**: the map viewport query, a lat/lng range scan over owned cells.
+6. **`territories_owner_id_idx`**: Speeds up `GET /api/territories/mine` and full leaderboard recalcs without a full table scan.
+7. **`territory_captures_user_id_captured_at_idx`**: a user's capture history, newest first.
+8. **`territory_captures_run_id_idx`**: the feed's "claimed N cells" count per run.
+9. **`follows_pkey (follower_id, followee_id)`**: Backs the `GET /api/social/following` list and prevents duplicate follows.
+10. **`follows_followee_id_idx`**: The inverse of the pkey; powers the `GET /api/social/followers` list.
+11. **`notifications_user_id_unread_idx`**: a partial index (`WHERE read_at IS NULL`), so counting unread alerts only touches unread rows, however many old notifications a user has.
+12. **`jobs_status_idx`**: Ensures the background worker `SELECT ... WHERE status='pending'` instantly finds the next job.
 
 ## Migrations
 

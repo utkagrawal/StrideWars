@@ -1,7 +1,5 @@
 # API Reference
 
-> **Status**: Finalized (Phase 15)
-
 ## Conventions
 
 - All routes are prefixed with `/api`
@@ -85,6 +83,11 @@
 - **Response**: `200 OK`
   - `{ "runs": [...], "nextCursor": "..." }`
 
+**GET `/api/runs/generate-loop`**
+- **Query**: `?lat=26.18&lng=91.69`
+- **Response**: `200 OK`
+  - `{ "points": [{ "lat": 0, "lng": 0, "recordedAt": "..." }] }`, a loop that follows nearby roads (OpenStreetMap), timestamped at a 5:30 /km pace. Falls back to a generated circle if the map data can't be fetched within 4 s.
+
 **GET `/api/runs/:id`**
 - **Query**: `?simplify=true&tolerance=5`
 - **Response**: `200 OK`
@@ -92,7 +95,16 @@
 
 ---
 
-## Territories
+## Territories *(Requires Auth)*
+
+**GET `/api/territories`**
+- **Query**: `?bbox=minLat,minLng,maxLat,maxLng`
+- **Response**: `200 OK`
+  - `{ "territories": [{ "geohash": "...", "owner_id": "...", "owner_username": "...", "captured_at": "...", "center_lat": 0, "center_lng": 0, "captured_run_id": "..." }], "truncated": false }`, the owned cells whose centre is inside the box (capped at 20,000).
+
+**GET `/api/territories/mine`**
+- **Response**: `200 OK`
+  - `{ "territories": [...] }`, every cell you own.
 
 **GET `/api/territories/:geohash`**
 - **Response**: `200 OK`
@@ -109,16 +121,16 @@
 **GET `/api/leaderboards/global`**
 - **Query**: `?limit=50`
 - **Response**: `200 OK`
-  - `{ "entries": [{ "userId": "...", "username": "...", "territoryCount": 10, "rank": 1 }] }`
+  - `{ "entries": [{ "userId": "...", "username": "...", "areaSquareMeters": 167401, "rank": 1 }] }`
 
 **GET `/api/leaderboards/global/me`** *(Requires Auth)*
 - **Response**: `200 OK`
-  - `{ "rank": 1, "territoryCount": 10 }`
+  - `{ "rank": 1, "areaSquareMeters": 167401 }` (`rank` is `null` if you own nothing)
 
 **GET `/api/leaderboards/region`**
-- **Query**: `?geohashPrefix=9q8&limit=50`
+- **Query**: either `?geohashPrefix=wh9&limit=50`, or `?lat=26.18&lng=91.69` to use the region around that point
 - **Response**: `200 OK`
-  - `{ "entries": [{ "userId": "...", "username": "...", "territoryCount": 5, "rank": 1 }] }`
+  - `{ "entries": [{ "userId": "...", "username": "...", "areaSquareMeters": 167401, "rank": 1 }], "regionName": "Guwahati", "prefix": "wh9" }`
 
 ---
 
@@ -143,7 +155,8 @@
 **GET `/api/social/feed`**
 - **Query**: `?cursor=2023...&limit=20`
 - **Response**: `200 OK`
-  - `{ "items": [{ "type": "run", "timestamp": "...", "username": "..." }], "nextCursor": "..." }`
+  - `{ "items": [{ "type": "run", "itemId": "<run id>", "userId": "...", "username": "...", "distanceMeters": 1800, "durationSeconds": 612, "cellsClaimed": 339, "timestamp": "..." }], "nextCursor": "..." }`
+  - Runs by you and the people you follow, newest first. Pass `nextCursor` back as `cursor` for the next page.
 
 ---
 
@@ -152,7 +165,7 @@
 **GET `/api/notifications`**
 - **Query**: `?cursor=2023...&limit=20`
 - **Response**: `200 OK`
-  - `{ "notifications": [{ "id": "...", "type": "...", "payload": {...}, "read_at": null, "created_at": "..." }], "nextCursor": "..." }`
+  - `{ "notifications": [{ "id": "...", "type": "territory_lost", "payload": { "message": "kabir took 5 cells of your ground.", "cellsLost": 5, "lostToUserId": "...", "lostToUsername": "kabir", "runId": "..." }, "readAt": null, "createdAt": "..." }], "nextCursor": "..." }`
 
 **GET `/api/notifications/unread-count`**
 - **Response**: `200 OK`
@@ -160,4 +173,4 @@
 
 **PATCH `/api/notifications/:id/read`**
 - **Response**: `200 OK`
-  - `{ "success": true }`
+  - `{ "notification": { ...same shape as above, with readAt set } }`
