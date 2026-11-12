@@ -1,6 +1,11 @@
 import ngeohash from 'ngeohash';
 
-export const GEOHASH_PRECISION = 7; // ~150m x 150m cells
+/**
+ * Map cell size. Precision 8 ≈ 38 m × 19 m at the equator (≈ 34 m × 19 m in Guwahati):
+ * small enough that a 1 km loop claims ~100 cells and the territory hugs the route.
+ * (Precision 7 would be about 150 m × 150 m, too coarse for a single run.)
+ */
+export const GEOHASH_PRECISION = 8;
 
 export interface Coordinates {
   lat: number;
@@ -9,7 +14,7 @@ export interface Coordinates {
 
 /**
  * Encodes a latitude and longitude into a geohash string.
- * Uses precision 7 by default for ~150m x 150m map cells.
+ * Uses GEOHASH_PRECISION (8) by default.
  */
 export function encodeGeohash(
   lat: number,
@@ -25,6 +30,16 @@ export function encodeGeohash(
 export function decodeGeohash(geohash: string): Coordinates {
   const decoded = ngeohash.decode(geohash);
   return { lat: decoded.latitude, lng: decoded.longitude };
+}
+
+/** Area of one geohash cell in m² (a lat/lng rectangle; narrower away from the equator). */
+export function geohashCellArea(geohash: string): number {
+  const [minLat, minLng, maxLat, maxLng] = ngeohash.decode_bbox(geohash);
+  const metersPerDegree = 111_320;
+  const midLatRad = (((minLat + maxLat) / 2) * Math.PI) / 180;
+  const height = (maxLat - minLat) * metersPerDegree;
+  const width = (maxLng - minLng) * metersPerDegree * Math.cos(midLatRad);
+  return height * width;
 }
 
 /**

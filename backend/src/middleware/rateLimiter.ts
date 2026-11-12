@@ -7,14 +7,22 @@ import { redis } from '../config/redis';
  * @param prefix Redis key prefix (e.g., 'rl:login')
  * @param maxRequests Maximum requests allowed in the window
  * @param windowSeconds Window duration in seconds
+ * @param keyFn Optional extra key part (e.g. the email being logged into), so limits can be
+ *              per IP *and* per account instead of shared by everyone behind the same IP.
  */
-export function rateLimit(prefix: string, maxRequests: number, windowSeconds: number) {
+export function rateLimit(
+  prefix: string,
+  maxRequests: number,
+  windowSeconds: number,
+  keyFn?: (req: Request) => string
+) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       // Use IP address as the identifier.
       // If behind a proxy, ensure app.set('trust proxy', 1) is configured in express.
       const ip = req.ip || req.connection.remoteAddress || 'unknown';
-      const key = `${prefix}:${ip}`;
+      const extra = keyFn ? `:${keyFn(req)}` : '';
+      const key = `${prefix}:${ip}${extra}`;
 
       // INCR increments the key by 1. If the key does not exist, it's set to 0 before performing the operation.
       const currentRequests = await redis.incr(key);

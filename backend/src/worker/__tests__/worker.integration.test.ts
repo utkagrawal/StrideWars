@@ -14,6 +14,15 @@ describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
   beforeEach(async () => {
     await pool.query('DELETE FROM notifications');
     await pool.query('DELETE FROM jobs');
+
+    // Ensure the fake user exists for the foreign key constraint on notifications
+    await pool.query(`
+      INSERT INTO users (id, email, username, password_hash)
+      VALUES 
+      ('00000000-0000-0000-0000-000000000000', 'worker1@test.com', 'worker1', 'hash'),
+      ('11111111-1111-1111-1111-111111111111', 'worker2@test.com', 'worker2', 'hash')
+      ON CONFLICT (id) DO NOTHING
+    `);
   });
 
   it('safely handles concurrent worker instances polling the same job', async () => {
@@ -28,7 +37,7 @@ describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
         {
           previousOwnerId: '00000000-0000-0000-0000-000000000000',
           newOwnerId: '11111111-1111-1111-1111-111111111111',
-          geohash: 'gbsuv7y',
+          cellsLost: 3,
         },
       ]
     );
@@ -48,6 +57,7 @@ describe('Background Worker Integration (FOR UPDATE SKIP LOCKED)', () => {
     // 4. Verify only one notification was created
     const { rows } = await pool.query('SELECT * FROM notifications');
     expect(rows.length).toBe(1);
+    expect(rows[0].payload.message).toBe('worker2 took 3 cells of your ground.');
 
     // 5. Verify the job is marked as 'done'
     const { rows: jobRows } = await pool.query('SELECT * FROM jobs');

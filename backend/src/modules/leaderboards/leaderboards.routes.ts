@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { query } from 'express-validator';
-import { requireAuth } from '../../../middleware/requireAuth';
-import { validate } from '../../../middleware/validate';
-import { asyncHandler } from '../../../middleware/asyncHandler';
-import { getGlobalLeaderboard, getUserGlobalRank, getRegionalLeaderboard } from '../controller';
+import { requireAuth } from '../../middleware/requireAuth';
+import { validate } from '../../middleware/validate';
+import { asyncHandler } from '../../middleware/asyncHandler';
+import {
+  getGlobalLeaderboard,
+  getUserGlobalRank,
+  getRegionalLeaderboard,
+} from './leaderboards.controller';
 
 const router = Router();
 
@@ -25,6 +29,7 @@ router.get(
   '/region',
   [
     query('geohashPrefix')
+      .optional()
       .isString()
       .isLength({ min: 1, max: 12 })
       .withMessage('Valid geohashPrefix is required'),

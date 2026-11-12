@@ -2,6 +2,7 @@ import request from 'supertest';
 import { createApp } from '../../../app';
 import { pool } from '../../../config/db';
 import crypto from 'crypto';
+import { stampAtPace } from '../../../utils/geo';
 
 const app = createApp();
 
@@ -108,16 +109,16 @@ describe('Social Integration', () => {
       .expect(200);
   });
 
-  it('returns a paginated activity feed merging runs and captures', async () => {
+  it('returns a keyset-paginated feed with one item per run, newest first', async () => {
     // We need some activity from user 2 and user 3
 
     // User 2 runs
-    const points2 = [
+    const points2 = stampAtPace([
       { lat: 38.0, lng: -122.0, recordedAt: new Date(Date.now() - 13000).toISOString() },
       { lat: 38.005, lng: -122.0, recordedAt: new Date(Date.now() - 12000).toISOString() },
       { lat: 38.005, lng: -122.005, recordedAt: new Date(Date.now() - 11000).toISOString() },
       { lat: 38.0, lng: -122.005, recordedAt: new Date(Date.now() - 10000).toISOString() },
-    ];
+    ]);
     await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u2Token}`)
@@ -125,12 +126,12 @@ describe('Social Integration', () => {
       .expect(201);
 
     // User 3 runs
-    const points3 = [
+    const points3 = stampAtPace([
       { lat: 39.0, lng: -122.0, recordedAt: new Date(Date.now() - 8000).toISOString() },
       { lat: 39.005, lng: -122.0, recordedAt: new Date(Date.now() - 7000).toISOString() },
       { lat: 39.005, lng: -122.005, recordedAt: new Date(Date.now() - 6000).toISOString() },
       { lat: 39.0, lng: -122.005, recordedAt: new Date(Date.now() - 5000).toISOString() },
-    ];
+    ]);
     await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u3Token}`)
@@ -143,8 +144,11 @@ describe('Social Integration', () => {
       .set('Authorization', `Bearer ${u1Token}`)
       .expect(200);
 
-    // Should have 4 items: 2 runs, 2 captures (one for each run)
-    expect(resFeed.body.items.length).toBeGreaterThanOrEqual(4);
+    // One item per run (user 2's and user 3's), each with the cells it claimed
+    expect(resFeed.body.items.length).toBe(2);
+    expect(resFeed.body.items[0].userId).toBe(u3Id); // newest first
+    expect(resFeed.body.items[0].type).toBe('run');
+    expect(resFeed.body.items[0].cellsClaimed).toBeGreaterThan(0);
 
     // Items should be sorted in descending order of timestamp
     const times = resFeed.body.items.map((i: any) => new Date(i.timestamp).getTime());

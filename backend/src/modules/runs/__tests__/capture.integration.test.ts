@@ -3,6 +3,7 @@ import { createApp } from '../../../app';
 import { pool } from '../../../config/db';
 // Unused import removed
 import crypto from 'crypto';
+import { stampAtPace } from '../../../utils/geo';
 
 const app = createApp();
 
@@ -60,12 +61,12 @@ describe('Territory Capture Integration', () => {
     const pt3 = { lat: 37.005, lng: -122.005 };
     const pt4 = { lat: 37.0, lng: -122.005 };
 
-    const points = [
+    const points = stampAtPace([
       { ...pt1, recordedAt: '2023-01-01T10:00:00Z' },
       { ...pt2, recordedAt: '2023-01-01T10:00:10Z' },
       { ...pt3, recordedAt: '2023-01-01T10:00:20Z' },
       { ...pt4, recordedAt: '2023-01-01T10:00:30Z' },
-    ];
+    ]);
 
     const clientRunId = crypto.randomUUID();
     const res = await request(app)
@@ -81,12 +82,12 @@ describe('Territory Capture Integration', () => {
 
   it('safely handles concurrent capturing of overlapping cells without deadlocking', async () => {
     // 3 users run the exact same square at the exact same time
-    const run1Points = [
+    const run1Points = stampAtPace([
       { lat: 38.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
       { lat: 38.005, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
       { lat: 38.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
       { lat: 38.0, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' },
-    ];
+    ]);
 
     const run2Points = [...run1Points].reverse(); // User 2 ran it backwards
     const run3Points = [run1Points[2], run1Points[3], run1Points[0], run1Points[1]]; // User 3 started at point C
@@ -133,12 +134,12 @@ describe('Territory Capture Integration', () => {
   });
 
   it('is idempotent and does not double-capture on replay', async () => {
-    const points = [
+    const points = stampAtPace([
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
       { lat: 39.005, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
       { lat: 39.005, lng: -122.005, recordedAt: '2023-01-01T10:00:20Z' },
       { lat: 39.0, lng: -122.005, recordedAt: '2023-01-01T10:00:30Z' },
-    ];
+    ]);
     const clientRunId = crypto.randomUUID();
 
     const res1 = await request(app)
@@ -163,12 +164,12 @@ describe('Territory Capture Integration', () => {
 
   it('rejects runs with an area greater than 5,000,000 m^2 with 422', async () => {
     // 1 degree is roughly 111km. 1 degree square is ~12,321,000,000 m^2
-    const points = [
+    const points = stampAtPace([
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
       { lat: 40.0, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
       { lat: 40.0, lng: -123.0, recordedAt: '2023-01-01T10:00:20Z' },
       { lat: 39.0, lng: -123.0, recordedAt: '2023-01-01T10:00:30Z' },
-    ];
+    ]);
     const clientRunId = crypto.randomUUID();
 
     const res = await request(app)
@@ -182,11 +183,11 @@ describe('Territory Capture Integration', () => {
   });
 
   it('gracefully handles a straight line (zero area)', async () => {
-    const points = [
+    const points = stampAtPace([
       { lat: 39.0, lng: -122.0, recordedAt: '2023-01-01T10:00:00Z' },
       { lat: 39.001, lng: -122.0, recordedAt: '2023-01-01T10:00:10Z' },
       { lat: 39.002, lng: -122.0, recordedAt: '2023-01-01T10:00:20Z' },
-    ];
+    ]);
     const clientRunId = crypto.randomUUID();
 
     const res = await request(app)

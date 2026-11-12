@@ -1,78 +1,48 @@
 /**
- * Smoke test for Phase 21: Seed Script
- *
- * Verifies that the seed script can be imported and its primary function
- * can be invoked without syntax errors, and that it makes the expected
- * calls to generate road loops and create runs for demo users.
+ * Unit tests for the demo seed's route builder.
+ * The seed must produce loops the real API accepts: closed, a realistic size,
+ * and (once timestamped) a believable running pace.
  */
-// Mock the modules that the seed script depends on
-jest.mock('../../utils/geo', () => ({
-  generateRoadLoop: jest.fn().mockResolvedValue([
-    { lat: 26.18, lng: 91.69, recordedAt: new Date().toISOString() },
-    { lat: 26.19, lng: 91.7, recordedAt: new Date().toISOString() },
-  ]),
-  generateRandomLoop: jest.fn().mockReturnValue([]),
-}));
+import { buildLoop, DEMO_CENTER } from '../seed';
+import {
+  stampAtPace,
+  polygonArea,
+  calculateTotalDistance,
+  calculateHaversineDistance,
+  calculatePace,
+} from '../../utils/geo';
 
-jest.mock('../../config/db', () => ({
-  pool: {
-    query: jest.fn().mockResolvedValue({ rows: [] }),
-    end: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+describe('demo seed: buildLoop', () => {
+  it('produces a closed, densely sampled loop', () => {
+    const loop = buildLoop(DEMO_CENTER, 300, 1);
+    const first = loop[0];
+    const last = loop[loop.length - 1];
 
-jest.mock('../../modules/users/users.service', () => ({
-  register: jest.fn().mockResolvedValue({
-    user: { id: 'demo-user-1', username: 'demo' },
-    accessToken: 'token',
-  }),
-}));
-
-jest.mock('../../modules/runs/runs.service', () => ({
-  createRun: jest.fn().mockResolvedValue({
-    run: { id: 'run-1' },
-    capturedTerritories: [],
-    enclosedAreaSquareMeters: 0,
-  }),
-}));
-
-// Provide a mock for console.log/error to keep test output clean
-jest.spyOn(console, 'log').mockImplementation(() => {});
-jest.spyOn(console, 'error').mockImplementation(() => {});
-jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-describe('Seed Script Smoke Test', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+    expect(loop.length).toBeGreaterThan(50);
+    expect(calculateHaversineDistance(first.lat, first.lng, last.lat, last.lng)).toBeLessThan(1);
   });
 
-  it('should successfully run the seed process and use generateRoadLoop', async () => {
-    // We isolate the execution so it doesn't run automatically on import
-    // if the file is structured to do so.
+  it('encloses a sensible area (well under the 5 km² cap)', () => {
+    const area = polygonArea(buildLoop(DEMO_CENTER, 300, 2));
+    expect(area).toBeGreaterThan(150_000);
+    expect(area).toBeLessThan(5_000_000);
+  });
 
-    // We'll dynamically import the seed script. We need to mock process.exit
-    // because the seed script calls it on completion.
-    const mockExit = jest
-      .spyOn(process, 'exit')
-      .mockImplementation((_code?: number | string | null | undefined) => {
-        return undefined as never;
-      });
+  it('is deterministic for a given seed', () => {
+    expect(buildLoop(DEMO_CENTER, 250, 7)).toEqual(buildLoop(DEMO_CENTER, 250, 7));
+  });
 
-    try {
-      // The seed script usually runs its logic in an IIFE or calling a main function.
-      // We are just verifying it compiles and can be required without blowing up.
-      const seedModule = await import('../seed');
+  it('passes the anti-spoofing pace check once timestamped', () => {
+    const points = stampAtPace(buildLoop(DEMO_CENTER, 300, 3), 330);
+    const distance = calculateTotalDistance(points);
+    const seconds =
+      (new Date(points[points.length - 1].recordedAt).getTime() -
+        new Date(points[0].recordedAt).getTime()) /
+      1000;
 
-      // If it exports runSeed, we could call it.
-      if (seedModule && typeof (seedModule as any).runSeed === 'function') {
-        await (seedModule as any).runSeed();
-      }
-
-      expect(true).toBe(true);
-    } catch (err) {
-      expect(err).toBeUndefined();
-    } finally {
-      mockExit.mockRestore();
-    }
+    const pace = calculatePace(distance, seconds)!;
+    expect(pace).toBeGreaterThan(90); // server rejects anything faster than 90 s/km
+    expect(pace).toBeGreaterThan(300);
+    expect(pace).toBeLessThan(400);
   });
 });

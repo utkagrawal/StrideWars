@@ -12,13 +12,18 @@ async function processJob(job: any): Promise<void> {
   const { type, payload } = job;
 
   if (type === 'territory_lost_notification') {
-    const { previousOwnerId, newOwnerId, geohash } = payload;
+    const { previousOwnerId, newOwnerId, runId } = payload;
+    const cellsLost: number = payload.cellsLost ?? 1;
 
-    // Create the notification
+    const { rows } = await pool.query(`SELECT username FROM users WHERE id = $1`, [newOwnerId]);
+    const lostToUsername: string = rows[0]?.username ?? 'Another runner';
+
     const notificationPayload = {
-      message: `You lost territory ${geohash} to another player!`,
-      geohash,
+      message: `${lostToUsername} took ${cellsLost} ${cellsLost === 1 ? 'cell' : 'cells'} of your ground.`,
+      cellsLost,
       lostToUserId: newOwnerId,
+      lostToUsername,
+      runId: runId ?? null,
     };
 
     await pool.query(`INSERT INTO notifications (user_id, type, payload) VALUES ($1, $2, $3)`, [

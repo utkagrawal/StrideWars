@@ -26,7 +26,9 @@ router.post(
 
 router.post(
   '/login',
-  rateLimit('rl:login', 5, 900), // 5 requests per 15 minutes
+  // 5 attempts per 15 minutes per (IP, email): stops password guessing against an account
+  // without locking out every other user on the same network (e.g. a demo or a campus NAT).
+  rateLimit('rl:login', 5, 900, (req) => String(req.body?.email ?? '').toLowerCase()),
   [
     body('email').trim().isEmail().withMessage('Must be a valid email').normalizeEmail(),
     body('password').notEmpty().withMessage('Password is required'),

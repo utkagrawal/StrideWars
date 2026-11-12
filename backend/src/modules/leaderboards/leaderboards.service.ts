@@ -17,30 +17,25 @@ export interface CaptureEvent {
 
 const GLOBAL_KEY = 'leaderboard:global';
 const GLOBAL_CACHE_KEY = 'leaderboard:cache:global';
-const CACHE_TTL_SEC = 30; // Increased to 30s for better DB protection
+// Short TTL: a burst of leaderboard reads costs one Postgres query per 5s window
+// (stampede protection), while a fresh capture still shows up almost immediately.
+const CACHE_TTL_SEC = 5;
 
-import { traceClusterPerimeter, polygonArea } from '../../utils/geo';
+import { geohashCellArea } from '../territories/geohash';
 
+/**
+ * Area a user owns, per 3-character geohash region (~150 km), in m².
+ * Territory is made of whole grid cells, so the exact area is simply the sum of the
+ * owned cells' areas (cells shrink slightly towards the poles, so we compute each one).
+ */
 async function computeUserRegionalTerritoryAreas(userId: string): Promise<Map<string, number>> {
   const { rows } = await pool.query('SELECT geohash FROM territories WHERE owner_id = $1', [
     userId,
   ]);
-  const hashesByRegion = new Map<string, string[]>();
-  for (const r of rows) {
-    const region = r.geohash.substring(0, 3);
-    if (!hashesByRegion.has(region)) hashesByRegion.set(region, []);
-    hashesByRegion.get(region)!.push(r.geohash);
-  }
-
   const areas = new Map<string, number>();
-  for (const [region, hashes] of hashesByRegion.entries()) {
-    const perimeters = traceClusterPerimeter(hashes);
-    let area = 0;
-    for (const ring of perimeters) {
-      const points = ring.map((pt) => ({ lat: pt[0], lng: pt[1] }));
-      area += polygonArea(points);
-    }
-    areas.set(region, area);
+  for (const { geohash } of rows) {
+    const region = geohash.substring(0, 3);
+    areas.set(region, (areas.get(region) ?? 0) + geohashCellArea(geohash));
   }
   return areas;
 }

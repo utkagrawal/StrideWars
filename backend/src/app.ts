@@ -10,10 +10,10 @@ import { healthRouter } from './routes/health';
 import authRouter from './modules/auth/auth.routes';
 import usersRouter from './modules/users/users.routes';
 import runsRouter from './modules/runs/runs.routes';
-import { territoriesRouter } from './modules/territories/routes';
-import { leaderboardsRouter } from './modules/leaderboards/routes';
-import { socialRouter } from './modules/social/routes';
-import { notificationsRouter } from './modules/notifications/routes';
+import { territoriesRouter } from './modules/territories/territories.routes';
+import { leaderboardsRouter } from './modules/leaderboards/leaderboards.routes';
+import { socialRouter } from './modules/social/social.routes';
+import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { env } from './config/env';
 
 export function createApp(): Application {

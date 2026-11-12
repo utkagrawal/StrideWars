@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { query, param, CustomValidator } from 'express-validator';
-import { requireAuth } from '../../../middleware/requireAuth';
-import { validate } from '../../../middleware/validate';
-import { asyncHandler } from '../../../middleware/asyncHandler';
+import { requireAuth } from '../../middleware/requireAuth';
+import { validate } from '../../middleware/validate';
+import { asyncHandler } from '../../middleware/asyncHandler';
 import {
   getTerritories,
   getTerritory,
   getTerritoryHistory,
   getMyTerritories,
-} from '../territories.controller';
+} from './territories.controller';
 
 const router = Router();
 

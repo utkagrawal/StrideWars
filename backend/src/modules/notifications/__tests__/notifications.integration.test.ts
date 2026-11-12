@@ -3,6 +3,7 @@ import { createApp } from '../../../app';
 import { pool } from '../../../config/db';
 import crypto from 'crypto';
 import { claimAndProcessJob } from '../../../worker';
+import { stampAtPace } from '../../../utils/geo';
 
 const app = createApp();
 
@@ -42,34 +43,31 @@ describe('Notifications & Background Worker Integration', () => {
 
   it('enqueues a job when territory is recaptured, processes it, and serves the notification', async () => {
     // 1. User 1 captures territory
-    const points1 = [
+    const points1 = stampAtPace([
       { lat: 37.0, lng: -122.0, recordedAt: new Date(Date.now() - 10000).toISOString() },
       { lat: 37.005, lng: -122.0, recordedAt: new Date(Date.now() - 9000).toISOString() },
       { lat: 37.005, lng: -122.005, recordedAt: new Date(Date.now() - 8000).toISOString() },
       { lat: 37.0, lng: -122.005, recordedAt: new Date(Date.now() - 7000).toISOString() },
-    ];
-    const r1 = await request(app)
+    ]);
+    await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u1Token}`)
       .send({ clientRunId: crypto.randomUUID(), startedAt: points1[0].recordedAt, points: points1 })
       .expect(201);
-    console.log('USER 1 CAPTURED:', r1.body.capturedTerritories);
 
     // 2. User 2 recaptures same territory
     const points2 = points1.map((p) => ({
       ...p,
       recordedAt: new Date(new Date(p.recordedAt).getTime() + 20000).toISOString(),
     }));
-    const r2 = await request(app)
+    await request(app)
       .post('/api/runs')
       .set('Authorization', `Bearer ${u2Token}`)
       .send({ clientRunId: crypto.randomUUID(), startedAt: points2[0].recordedAt, points: points2 })
       .expect(201);
-    console.log('USER 2 CAPTURED:', r2.body.capturedTerritories);
 
     // 3. Verify a pending job was created
     const { rows: jobs } = await pool.query(`SELECT * FROM jobs`);
-    console.log('ALL JOBS FOUND:', jobs);
     const pendingJobs = jobs.filter((j) => j.status === 'pending');
     expect(pendingJobs.length).toBeGreaterThan(0);
     const notifJob = jobs.find((j) => j.type === 'territory_lost_notification');

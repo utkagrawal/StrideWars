@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { pool } from '../config/db';
 import crypto from 'crypto';
 import { encodeGeohash } from '../modules/territories/geohash';
+import { stampAtPace } from '../utils/geo';
 
 const app = createApp();
 
@@ -81,12 +82,12 @@ describe('End-to-End User Journey', () => {
       .send({
         clientRunId: u1ClientRunId,
         startedAt: new Date().toISOString(),
-        points: [
+        points: stampAtPace([
           { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 30000).toISOString() },
           { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 20000).toISOString() },
           { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 10000).toISOString() },
           { lat: 40.712, lng: -74.004, recordedAt: new Date().toISOString() },
-        ],
+        ]),
       })
       .expect(201);
 
@@ -100,7 +101,7 @@ describe('End-to-End User Journey', () => {
     const lbRes1 = await request(app).get('/api/leaderboards/global').expect(200);
     const u1Rank = lbRes1.body.entries.find((u: any) => u.userId === user1Id);
     expect(u1Rank).toBeDefined();
-    expect(u1Rank.territoryCount).toBe(u1RunRes.body.capturedTerritories.length);
+    expect(u1Rank.areaSquareMeters).toBeGreaterThan(0);
 
     // 2. User 2 uploads a run capturing the SAME territory (recapture)
     const u2ClientRunId = crypto.randomUUID();
@@ -110,12 +111,12 @@ describe('End-to-End User Journey', () => {
       .send({
         clientRunId: u2ClientRunId,
         startedAt: new Date().toISOString(),
-        points: [
+        points: stampAtPace([
           { lat: 40.712, lng: -74.007, recordedAt: new Date(Date.now() - 30000).toISOString() },
           { lat: 40.714, lng: -74.007, recordedAt: new Date(Date.now() - 20000).toISOString() },
           { lat: 40.714, lng: -74.004, recordedAt: new Date(Date.now() - 10000).toISOString() },
           { lat: 40.712, lng: -74.004, recordedAt: new Date().toISOString() },
-        ],
+        ]),
       })
       .expect(201);
 
@@ -131,8 +132,8 @@ describe('End-to-End User Journey', () => {
     const lbRes2 = await request(app).get('/api/leaderboards/global').expect(200);
     const u2Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user2Id);
     const u1Rank2 = lbRes2.body.entries.find((u: any) => u.userId === user1Id);
-    expect(u2Rank2.territoryCount).toBe(u2RunRes.body.capturedTerritories.length);
-    expect(u1Rank2?.territoryCount || 0).toBe(0);
+    expect(u2Rank2.areaSquareMeters).toBeGreaterThan(0);
+    expect(u1Rank2?.areaSquareMeters || 0).toBe(0); // user 1 lost everything
 
     // 3. Trigger worker to process notification job
     // The background worker polls jobs table, but since we're in integration tests without the worker running,
@@ -149,8 +150,10 @@ describe('End-to-End User Journey', () => {
     expect(notifRes.body.notifications.length).toBeGreaterThanOrEqual(1);
     const lostNotifs = notifRes.body.notifications.filter((n: any) => n.type === 'territory_lost');
     expect(lostNotifs.length).toBeGreaterThanOrEqual(1);
-    expect(lostNotifs.map((n: any) => n.payload.geohash)).toContain(nycHash);
-    expect(lostNotifs.some((n: any) => n.payload.lostToUserId === user2Id)).toBe(true);
+    // One notification per steal (not one per cell), naming the thief and the cell count
+    expect(lostNotifs).toHaveLength(1);
+    expect(lostNotifs[0].payload.lostToUserId).toBe(user2Id);
+    expect(lostNotifs[0].payload.cellsLost).toBe(u2RunRes.body.capturedTerritories.length);
 
     // 5. User 3 (fan) checks their social feed
     const feedRes = await request(app)
@@ -158,18 +161,10 @@ describe('End-to-End User Journey', () => {
       .set('Authorization', `Bearer ${user3Token}`)
       .expect(200);
 
-    // They should see both run completions and both territory captures
+    // They should see both runs, each with the number of cells it claimed
     const feed = feedRes.body.items;
-    expect(feed.length).toBeGreaterThanOrEqual(4); // 2 runs + 2 captures minimum
-
-    const hasU1Run = feed.some((f: any) => f.type === 'run' && f.userId === user1Id);
-    const hasU2Run = feed.some((f: any) => f.type === 'run' && f.userId === user2Id);
-    const hasU1Capture = feed.some((f: any) => f.type === 'capture' && f.userId === user1Id);
-    const hasU2Capture = feed.some((f: any) => f.type === 'capture' && f.userId === user2Id);
-
-    expect(hasU1Run).toBe(true);
-    expect(hasU2Run).toBe(true);
-    expect(hasU1Capture).toBe(true);
-    expect(hasU2Capture).toBe(true);
+    expect(feed).toHaveLength(2);
+    expect(feed.map((f: any) => f.userId)).toEqual([user2Id, user1Id]); // newest first
+    expect(feed.every((f: any) => f.cellsClaimed > 0)).toBe(true);
   });
 });

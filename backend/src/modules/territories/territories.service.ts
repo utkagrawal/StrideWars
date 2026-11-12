@@ -1,5 +1,4 @@
 import { pool } from '../../config/db';
-import { getGeohashesInBbox } from './geohash';
 
 export interface Territory {
   geohash: string;
@@ -11,54 +10,34 @@ export interface Territory {
   center_lng: number;
 }
 
+/** Safety cap so a zoomed-out request can't return an unbounded number of rows. */
+const MAX_CELLS_PER_VIEWPORT = 20_000;
+
+/**
+ * Owned cells whose centre falls inside the map viewport.
+ *
+ * A plain range query on (center_lat, center_lng), served by a B-tree index. We only
+ * store cells someone has claimed, so this returns owned ground and nothing else.
+ */
 export async function getTerritoriesInBbox(
   minLat: number,
   minLng: number,
   maxLat: number,
   maxLng: number
-): Promise<{
-  territories: Territory[];
-  runPolygons: Record<string, { lat: number; lng: number }[]>;
-}> {
-  // 1. Determine which geohash cells fall within the requested viewport
-  const targetHashes = getGeohashesInBbox(minLat, minLng, maxLat, maxLng);
-
-  if (targetHashes.length === 0) {
-    return { territories: [], runPolygons: {} };
-  }
-
-  // Cap the maximum number of hashes we query at once to prevent abusive massive queries
-  // 5000 cells is roughly a 10km x 10km box at precision 7, plenty for a screen viewport
-  const maxHashes = 5000;
-  const queryHashes =
-    targetHashes.length > maxHashes ? targetHashes.slice(0, maxHashes) : targetHashes;
-
-  // 2. Fetch those cells from the DB, joining with users to get the owner's username
+): Promise<{ territories: Territory[]; truncated: boolean }> {
   const { rows } = await pool.query(
-    `SELECT t.geohash, t.owner_id, t.captured_run_id, t.captured_at, t.center_lat, t.center_lng, u.username as owner_username
+    `SELECT t.geohash, t.owner_id, t.captured_run_id, t.captured_at,
+            t.center_lat, t.center_lng, u.username AS owner_username
      FROM territories t
      JOIN users u ON t.owner_id = u.id
-     WHERE t.geohash = ANY($1)`,
-    [queryHashes]
+     WHERE t.center_lat BETWEEN $1 AND $3
+       AND t.center_lng BETWEEN $2 AND $4
+     LIMIT $5`,
+    [minLat, minLng, maxLat, maxLng, MAX_CELLS_PER_VIEWPORT + 1]
   );
 
-  const territories = rows as Territory[];
-
-  // 3. Fetch unique path polygons for the captured_run_ids in the viewport
-  const runIds = [...new Set(territories.map((t) => t.captured_run_id).filter(Boolean))];
-  const runPolygons: Record<string, { lat: number; lng: number }[]> = {};
-
-  if (runIds.length > 0) {
-    const { rows: runRows } = await pool.query(
-      `SELECT id, path_polygon FROM runs WHERE id = ANY($1) AND path_polygon IS NOT NULL`,
-      [runIds]
-    );
-    for (const r of runRows) {
-      runPolygons[r.id] = r.path_polygon;
-    }
-  }
-
-  return { territories, runPolygons };
+  const truncated = rows.length > MAX_CELLS_PER_VIEWPORT;
+  return { territories: rows.slice(0, MAX_CELLS_PER_VIEWPORT) as Territory[], truncated };
 }
 
 export async function getTerritoryByGeohash(geohash: string): Promise<Territory | null> {

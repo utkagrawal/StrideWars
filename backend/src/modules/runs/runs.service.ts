@@ -48,7 +48,12 @@ export async function createRun(
   // Calculate stats
   const distanceMeters = calculateTotalDistance(sortedPoints);
 
-  const startTime = new Date(startedAt).getTime();
+  // Measure from whichever is earlier: the client's start time or its first GPS fix.
+  // (A clock-skewed `startedAt` must never make an honest run look impossibly fast.)
+  const startTime = Math.min(
+    new Date(startedAt).getTime(),
+    new Date(sortedPoints[0].recordedAt).getTime()
+  );
   const endTime = new Date(sortedPoints[sortedPoints.length - 1].recordedAt).getTime();
   const durationSeconds = Math.max(0, Math.floor((endTime - startTime) / 1000));
 
@@ -123,73 +128,66 @@ export async function createRun(
       );
     }
 
-    // 4. Capture Territories
+    // 4. Capture territories with a few set-based statements, however big the loop.
+    // `uniqueHashes` is sorted and every statement works in that order, so all transactions
+    // lock cells in the same global order: two overlapping runs can never deadlock.
     const capturedTerritories: { geohash: string; previousOwnerId: string | null }[] = [];
+    const cellsLostByOwner = new Map<string, number>();
 
-    for (const hash of uniqueHashes) {
-      const { lat, lng } = decodeGeohash(hash);
+    if (uniqueHashes.length > 0) {
+      const centers = uniqueHashes.map(decodeGeohash);
 
-      // 1. Ensure the row exists idempotently to avoid UPSERT race conditions
+      // 4a. Make sure a row exists for every cell (no-op for cells that already exist).
       await client.query(
-        `
-        INSERT INTO territories (geohash, owner_id, captured_at, center_lat, center_lng, captured_run_id)
-        VALUES ($1, NULL, NOW(), $2, $3, NULL)
-        ON CONFLICT (geohash) DO NOTHING
-      `,
-        [hash, lat, lng]
+        `INSERT INTO territories (geohash, center_lat, center_lng, owner_id, captured_at)
+         SELECT g, lat, lng, NULL, NOW()
+         FROM unnest($1::text[], $2::float8[], $3::float8[]) AS u(g, lat, lng)
+         ORDER BY g
+         ON CONFLICT (geohash) DO NOTHING`,
+        [uniqueHashes, centers.map((c) => c.lat), centers.map((c) => c.lng)]
       );
 
-      // 2. Lock the row, read previous owner, and update
-      const res = await client.query(
-        `
-        WITH old_terr AS (
-          SELECT owner_id as previous_owner_id, id as territory_id
-          FROM territories
-          WHERE geohash = $1 FOR UPDATE
-        ),
-        updated AS (
-          UPDATE territories
-          SET owner_id = $2, captured_at = NOW(), captured_run_id = $3
-          WHERE geohash = $1 AND (owner_id != $2 OR owner_id IS NULL)
-          RETURNING id
-        )
-        SELECT 
-          o.territory_id,
-          o.previous_owner_id
-        FROM old_terr o
-      `,
-        [hash, userId, run.id]
+      // 4b. Lock all the cells (in sorted order) and read who owned each one.
+      const { rows: locked } = await client.query(
+        `SELECT id, geohash, owner_id FROM territories
+         WHERE geohash = ANY($1::text[])
+         ORDER BY geohash
+         FOR UPDATE`,
+        [uniqueHashes]
       );
+      const territoryIds: string[] = locked.map((r) => r.id);
 
-      const previousOwnerId = res.rows[0]?.previous_owner_id || null;
-      const territoryId = res.rows[0].territory_id;
-
-      console.log('CAPTURE DEBUG:', res.rows[0]);
-
-      // Log the capture history
+      // 4c. Hand every cell to the runner.
       await client.query(
-        `INSERT INTO territory_captures (territory_id, run_id, user_id) VALUES ($1, $2, $3)`,
-        [territoryId, run.id, userId]
+        `UPDATE territories SET owner_id = $2, captured_at = NOW(), captured_run_id = $3
+         WHERE id = ANY($1::uuid[])`,
+        [territoryIds, userId, run.id]
       );
 
-      capturedTerritories.push({ geohash: hash, previousOwnerId });
+      // 4d. Append to the capture history (powers the feed and per-cell history).
+      await client.query(
+        `INSERT INTO territory_captures (territory_id, run_id, user_id)
+         SELECT unnest($1::uuid[]), $2, $3`,
+        [territoryIds, run.id, userId]
+      );
 
-      console.log('CHECKING IF JOB SHOULD ENQUEUE:', { previousOwnerId, userId });
-
-      if (previousOwnerId && previousOwnerId !== userId) {
-        console.log('ENQUEUEING JOB for', hash);
-        // Enqueue a job to send a notification to the previous owner
-        await client.query(`INSERT INTO jobs (type, payload) VALUES ($1, $2)`, [
-          'territory_lost_notification',
-          {
-            previousOwnerId,
-            newOwnerId: userId,
-            geohash: hash,
-          },
-        ]);
-        const { rows: debugJobs } = await client.query('SELECT * FROM jobs');
-        console.log('JOBS INSIDE TX:', debugJobs);
+      for (const row of locked) {
+        const previousOwnerId: string | null = row.owner_id;
+        capturedTerritories.push({ geohash: row.geohash, previousOwnerId });
+        if (previousOwnerId && previousOwnerId !== userId) {
+          cellsLostByOwner.set(previousOwnerId, (cellsLostByOwner.get(previousOwnerId) ?? 0) + 1);
+        }
       }
+    }
+
+    // 5. Queue ONE "you lost ground" notification per victim (not one per cell).
+    // The job is written in the same transaction, so it only exists if the capture commits
+    // (transactional outbox). The background worker turns it into a notification.
+    for (const [previousOwnerId, cellsLost] of cellsLostByOwner) {
+      await client.query(`INSERT INTO jobs (type, payload) VALUES ($1, $2)`, [
+        'territory_lost_notification',
+        { previousOwnerId, newOwnerId: userId, runId: run.id, cellsLost },
+      ]);
     }
 
     return { run, capturedTerritories, enclosedAreaSquareMeters };
@@ -205,9 +203,9 @@ export async function createRun(
   }));
 
   if (captureEvents.length > 0) {
-    // Imported dynamically to avoid circular dependencies if any, or just import at top
+    // Fire-and-forget: Redis is a derived view, Postgres stays the source of truth.
+    // If this fails, `npm run db:reconcile` rebuilds the leaderboards from Postgres.
     updateScores(captureEvents).catch((err) => {
-      // Already caught in updateScores, but just in case
       console.error('Failed post-commit score update:', err);
     });
   }

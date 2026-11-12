@@ -3,6 +3,7 @@ import {
   decodeGeohash,
   getGeohashesInBbox,
   computeIntersectingGeohashes,
+  GEOHASH_PRECISION,
 } from '../geohash';
 
 describe('Geohash Utilities', () => {
@@ -27,7 +28,7 @@ describe('Geohash Utilities', () => {
       const hashes = getGeohashesInBbox(37.7, -122.5, 37.8, -122.4);
       expect(hashes).toBeInstanceOf(Array);
       expect(hashes.length).toBeGreaterThan(0);
-      expect(hashes[0].length).toBe(7);
+      expect(hashes[0].length).toBe(GEOHASH_PRECISION);
     });
   });
 

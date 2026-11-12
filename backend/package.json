@@ -11,6 +11,7 @@
     "worker:dev": "nodemon --exec ts-node src/worker/index.ts",
     "worker:start": "node dist/worker/index.js",
     "db:seed": "ts-node src/scripts/seed.ts",
+    "db:seed:scale": "ts-node src/scripts/seed-scale.ts",
     "db:reconcile": "ts-node src/scripts/reconcileLeaderboards.ts",
     "test": "DATABASE_URL=postgresql://stridewars:changeme@localhost:5433/stridewars_test REDIS_URL=redis://localhost:6379/1 jest --forceExit --testPathIgnorePatterns=integration",
     "test:unit": "DATABASE_URL=postgresql://stridewars:changeme@localhost:5433/stridewars_test REDIS_URL=redis://localhost:6379/1 jest --forceExit --testPathIgnorePatterns=integration",

@@ -3,6 +3,7 @@ import { createApp } from '../../../app';
 import { pool } from '../../../config/db';
 import { redis } from '../../../config/redis';
 import ngeohash from 'ngeohash';
+import { stampAtPace } from '../../../utils/geo';
 
 const app = createApp();
 
@@ -55,12 +56,12 @@ describe('Leaderboards Integration', () => {
   });
 
   it('updates the leaderboard when a user captures territories via run upload', async () => {
-    const points = [
+    const points = stampAtPace([
       { lat: 37.0, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:00:01Z' },
       { lat: 37.005, lng: -122.0, ele: 10, recordedAt: '2023-01-01T10:00:11Z' },
       { lat: 37.005, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:00:21Z' },
       { lat: 37.0, lng: -122.005, ele: 10, recordedAt: '2023-01-01T10:00:31Z' },
-    ];
+    ]);
 
     // Upload run for u1
     const runRes = await request(app)
@@ -68,7 +69,7 @@ describe('Leaderboards Integration', () => {
       .set('Authorization', `Bearer ${u1Token}`)
       .send({
         clientRunId: require('crypto').randomUUID(),
-        startedAt: '2023-01-01T10:00:00Z',
+        startedAt: points[0].recordedAt,
         points,
       });
     if (runRes.status !== 201)
@@ -82,7 +83,7 @@ describe('Leaderboards Integration', () => {
 
     expect(res.body.entries).toHaveLength(1);
     expect(res.body.entries[0].userId).toBe(u1Id);
-    expect(res.body.entries[0].territoryCount).toBe(runRes.body.capturedTerritories.length);
+    expect(res.body.entries[0].areaSquareMeters).toBeGreaterThan(0);
     expect(res.body.entries[0].rank).toBe(1);
     expect(res.body.entries[0].username).toBe('lbuser1');
 

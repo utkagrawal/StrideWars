@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { param, query } from 'express-validator';
-import { requireAuth } from '../../../middleware/requireAuth';
-import { validate } from '../../../middleware/validate';
-import { asyncHandler } from '../../../middleware/asyncHandler';
-import { getNotifications, markAsRead, getUnreadCount } from '../controller';
-import { getNotificationOwner } from '../notifications.service';
-import { requireOwnership } from '../../../middleware/requireOwnership';
+import { requireAuth } from '../../middleware/requireAuth';
+import { validate } from '../../middleware/validate';
+import { asyncHandler } from '../../middleware/asyncHandler';
+import { getNotifications, markAsRead, getUnreadCount } from './notifications.controller';
+import { getNotificationOwner } from './notifications.service';
+import { requireOwnership } from '../../middleware/requireOwnership';
 
 const router = Router();
 

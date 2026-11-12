@@ -413,6 +413,38 @@ export function destinationPoint(
   };
 }
 
+/** Typical easy-run pace used when we synthesise demo runs (5:30 min/km). */
+export const DEMO_PACE_SEC_PER_KM = 330;
+const OVERPASS_TIMEOUT_MS = 4000;
+
+/**
+ * Assigns `recordedAt` timestamps to a path as if it had been run at a steady pace,
+ * so that synthetic routes pass the server's anti-spoofing pace check.
+ * The run is placed so that it finishes at `endTime` (defaults to now).
+ */
+export function stampAtPace<T extends Point>(
+  points: T[],
+  secPerKm: number = DEMO_PACE_SEC_PER_KM,
+  endTime: Date = new Date()
+): (T & { recordedAt: string })[] {
+  const offsetsSec: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const d = calculateHaversineDistance(
+      points[i - 1].lat,
+      points[i - 1].lng,
+      points[i].lat,
+      points[i].lng
+    );
+    // At least 1s between samples, like a real GPS watch.
+    offsetsSec.push(offsetsSec[i - 1] + Math.max(1, Math.round((d / 1000) * secPerKm)));
+  }
+  const startMs = endTime.getTime() - offsetsSec[offsetsSec.length - 1] * 1000;
+  return points.map((p, i) => ({
+    ...p,
+    recordedAt: new Date(startMs + offsetsSec[i] * 1000).toISOString(),
+  }));
+}
+
 /**
  * Generates a random closed loop of points around a center for demo purposes.
  */
@@ -422,25 +454,17 @@ export function generateRandomLoop(
   numPoints = 12,
   baseRadius = 150
 ): (Point & { recordedAt: string })[] {
-  const points: (Point & { recordedAt: string })[] = [];
-  const now = new Date();
+  const points: Point[] = [];
 
   for (let i = 0; i < numPoints; i++) {
     const angle = (360 / numPoints) * i;
     const jitteredAngle = angle + (Math.random() * 20 - 10);
     const jitteredRadius = baseRadius + (Math.random() * 100 - 50);
-
-    const pt = destinationPoint(centerLat, centerLng, jitteredAngle, jitteredRadius);
-    points.push({ ...pt, recordedAt: new Date(now.getTime() + i * 1000).toISOString() });
+    points.push(destinationPoint(centerLat, centerLng, jitteredAngle, jitteredRadius));
   }
+  points.push({ ...points[0] }); // close the loop
 
-  points.push({
-    lat: points[0].lat,
-    lng: points[0].lng,
-    recordedAt: new Date(now.getTime() + numPoints * 1000).toISOString(),
-  });
-
-  return points;
+  return stampAtPace(points);
 }
 
 /**
@@ -461,6 +485,8 @@ export async function generateRoadLoop(
       method: 'POST',
       body: `data=${encodeURIComponent(query)}`,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      // Never let a slow third-party API hang the request; fall back instead.
+      signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -543,27 +569,15 @@ export async function generateRoadLoop(
       }
     }
 
-    const now = new Date();
-    const points: (Point & { recordedAt: string })[] = [];
+    const path: Point[] = pathIds.map((id) => nodes.get(id)!);
+    path.push({ ...path[0] }); // close the loop
 
-    for (let i = 0; i < pathIds.length; i++) {
-      const pt = nodes.get(pathIds[i])!;
-      points.push({
-        lat: pt.lat,
-        lng: pt.lng,
-        recordedAt: new Date(now.getTime() + i * 1000).toISOString(),
-      });
-    }
-
-    points.push({
-      lat: points[0].lat,
-      lng: points[0].lng,
-      recordedAt: new Date(now.getTime() + pathIds.length * 1000).toISOString(),
-    });
-
-    return points;
+    return stampAtPace(path);
   } catch (err) {
-    console.warn('Road loop generation failed, falling back to circular loop:', err);
+    console.warn(
+      'Road loop generation failed, falling back to circular loop:',
+      (err as Error).message
+    );
     return generateRandomLoop(centerLat, centerLng, 12, 150);
   }
 }

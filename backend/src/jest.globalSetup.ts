@@ -2,11 +2,16 @@ import { Client } from 'pg';
 import { execSync } from 'child_process';
 import path from 'path';
 
+// The test DB URL comes from the npm script (Docker Postgres on :5433 by default),
+// but can be overridden to point at any local Postgres.
+const TEST_DB_URL =
+  process.env.DATABASE_URL || 'postgresql://stridewars:changeme@localhost:5433/stridewars_test';
+
 export default async () => {
-  // Use the default dev postgres db to connect and issue CREATE DATABASE
-  const adminClient = new Client({
-    connectionString: 'postgresql://stridewars:changeme@localhost:5433/postgres',
-  });
+  // Connect to the server's default `postgres` DB to issue CREATE DATABASE
+  const adminUrl = new URL(TEST_DB_URL);
+  adminUrl.pathname = '/postgres';
+  const adminClient = new Client({ connectionString: adminUrl.toString() });
 
   try {
     await adminClient.connect();
@@ -29,7 +34,7 @@ export default async () => {
     execSync('npm run migrate:up', {
       env: {
         ...process.env,
-        DATABASE_URL: 'postgresql://stridewars:changeme@localhost:5433/stridewars_test',
+        DATABASE_URL: TEST_DB_URL,
         // Clear DOTENV_CONFIG_PATH so node-pg-migrate doesn't load the dev .env
         DOTENV_CONFIG_PATH: '',
       },

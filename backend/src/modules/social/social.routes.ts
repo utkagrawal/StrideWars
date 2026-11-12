@@ -1,15 +1,9 @@
 import { Router } from 'express';
 import { param, query } from 'express-validator';
-import { requireAuth } from '../../../middleware/requireAuth';
-import { validate } from '../../../middleware/validate';
-import { asyncHandler } from '../../../middleware/asyncHandler';
-import {
-  followUser,
-  unfollowUser,
-  getFollowers,
-  getFollowing,
-  getFeed,
-} from '../social.controller';
+import { requireAuth } from '../../middleware/requireAuth';
+import { validate } from '../../middleware/validate';
+import { asyncHandler } from '../../middleware/asyncHandler';
+import { followUser, unfollowUser, getFollowers, getFollowing, getFeed } from './social.controller';
 
 const router = Router();
 
