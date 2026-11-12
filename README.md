@@ -76,7 +76,7 @@ frontend/src/
 
 ## Running it locally
 
-You need Node 20 or newer and Docker Desktop.
+You need Node 22 or newer and Docker Desktop.
 
 ```bash
 npm install
