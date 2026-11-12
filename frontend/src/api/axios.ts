@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // Basic instance for normal API calls
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// In dev, Vite proxies /api to the backend (see vite.config.ts), so the app and API share
+// an origin and the httpOnly refresh cookie just works. Production sets VITE_API_URL.
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
   baseURL: API_URL,

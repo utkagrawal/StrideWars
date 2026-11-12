@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -9,63 +9,35 @@ interface Toast {
 }
 
 interface ToastContextType {
-  addToast: (message: string, type: ToastType) => void;
+  addToast: (message: string, type?: ToastType) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
+let nextId = 1;
+
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (message: string, type: ToastType) => {
-    const id = Date.now();
+  // Stable identity so components can safely list it in effect dependencies.
+  const addToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = nextId++;
     setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 3000);
-  };
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
+
+  const value = useMemo(() => ({ addToast }), [addToast]);
 
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={value}>
       {children}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          zIndex: 9999,
-        }}
-      >
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            style={{
-              background:
-                toast.type === 'error'
-                  ? 'var(--color-bg-error, #f44336)'
-                  : toast.type === 'success'
-                    ? 'var(--color-brand-primary, #4ade80)'
-                    : '#2196f3',
-              color: 'white',
-              padding: '12px 24px',
-              borderRadius: '4px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              animation: 'slideIn 0.3s ease-out',
-            }}
-          >
-            {toast.message}
+      <div className="toasts" role="status" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.type}`}>
+            {t.message}
           </div>
         ))}
       </div>
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 };

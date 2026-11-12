@@ -14,6 +14,8 @@ interface AuthContextType {
   login: (userData: User, token: string) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  /** Replace the in-memory user after a profile edit, so every screen shows the change. */
+  updateUser: (userData: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,11 +62,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>; // or a spinner
+    // Silent refresh in progress (restoring the session from the httpOnly cookie)
+    return (
+      <div className="center-fill" style={{ minHeight: '100vh' }}>
+        <div className="spinner" role="status" aria-label="Loading" />
+      </div>
+    );
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, checkAuth }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user, login, logout, checkAuth, updateUser: setUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

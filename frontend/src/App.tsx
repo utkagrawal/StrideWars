@@ -1,156 +1,67 @@
-import React from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { ToastProvider } from './hooks/useToast';
+import { ToastProvider, useToast } from './hooks/useToast';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { NavBar } from './components/NavBar';
+import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { Profile } from './pages/Profile';
-import { RunHistory } from './pages/RunHistory';
-import { RecordRun } from './pages/RecordRun';
-import { RunDetail } from './pages/RunDetail';
-import { TerritoriesMap } from './pages/TerritoriesMap';
+import { MapPage } from './pages/MapPage';
 import { Leaderboards } from './pages/Leaderboards';
 import { Feed } from './pages/Feed';
 import { Notifications } from './pages/Notifications';
-import HomePage from './pages/HomePage';
-import { Landing } from './pages/Landing';
-import { getUnreadCount } from './api/notifications';
+import { RunHistory } from './pages/RunHistory';
+import { RunDetail } from './pages/RunDetail';
+import { Profile } from './pages/Profile';
 
-const NotificationBell = () => {
+/** Logged in → the live map. Logged out → the landing page. */
+const Home = () => {
   const { user } = useAuth();
-  const [unreadCount, setUnreadCount] = React.useState(0);
+  return user ? <MapPage /> : <Landing />;
+};
 
-  React.useEffect(() => {
-    if (!user) return;
-    const fetchCount = async () => {
-      try {
-        const { count } = await getUnreadCount();
-        setUnreadCount(count);
-      } catch (err) {
-        console.error(err);
-      }
+/** Bridges axios interceptor events (fired outside React) into toasts / logout. */
+function GlobalApiListeners() {
+  const { logout } = useAuth();
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const onError = (e: Event) =>
+      addToast((e as CustomEvent).detail?.message || 'Something went wrong', 'error');
+    const onUnauthorized = () => {
+      logout();
+      addToast('Your session expired. Please log in again.', 'error');
     };
-    fetchCount();
-    // Poll every 30s
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+    window.addEventListener('api-error', onError);
+    window.addEventListener('api-unauthorized', onUnauthorized);
+    return () => {
+      window.removeEventListener('api-error', onError);
+      window.removeEventListener('api-unauthorized', onUnauthorized);
+    };
+  }, [addToast, logout]);
 
-  return (
-    <Link
-      to="/notifications"
-      style={{ color: 'white', textDecoration: 'none', position: 'relative', fontSize: '1.2rem' }}
-    >
-      🔔
-      {unreadCount > 0 && (
-        <span
-          style={{
-            position: 'absolute',
-            top: '-8px',
-            right: '-10px',
-            background: 'red',
-            color: 'white',
-            borderRadius: '50%',
-            padding: '2px 6px',
-            fontSize: '0.7rem',
-            fontWeight: 'bold',
-          }}
-        >
-          {unreadCount > 99 ? '99+' : unreadCount}
-        </span>
-      )}
-    </Link>
-  );
-};
+  return null;
+}
 
-const RootRoute = () => {
+export const AppRoutes = () => {
   const { user } = useAuth();
-  return user ? <TerritoriesMap /> : <Landing />;
-};
-
-const AppShell = () => {
-  const { user } = useAuth();
-
   return (
-    <div className="app-layout">
-      <header
-        className="app-header"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          padding: '1rem 2rem',
-          alignItems: 'center',
-        }}
-      >
-        <h1 style={{ margin: 0 }}>
-          <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>
-            StrideWars
-          </Link>
-        </h1>
-        {user ? (
-          <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', fontWeight: 500 }}>
-            <Link to="/feed" style={{ color: 'white', textDecoration: 'none' }}>
-              Feed
-            </Link>
-            <Link to="/" style={{ color: 'white', textDecoration: 'none' }}>
-              Map
-            </Link>
-            <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>
-              Dashboard
-            </Link>
-            <Link to="/runs" style={{ color: 'white', textDecoration: 'none' }}>
-              Runs
-            </Link>
-            <Link
-              to="/runs/new"
-              style={{ color: 'var(--color-brand-primary)', textDecoration: 'none' }}
-            >
-              + Record
-            </Link>
-            <Link to="/leaderboards" style={{ color: 'white', textDecoration: 'none' }}>
-              Rankings
-            </Link>
-            <NotificationBell />
-            <Link to="/profile" style={{ color: 'white', textDecoration: 'none' }}>
-              Profile
-            </Link>
-          </nav>
-        ) : (
-          <nav style={{ display: 'flex', gap: '1rem' }}>
-            <Link to="/login" style={{ color: 'white', textDecoration: 'none' }}>
-              Log In
-            </Link>
-            <Link
-              to="/register"
-              style={{
-                color: 'white',
-                textDecoration: 'none',
-                background: 'var(--color-brand-primary)',
-                padding: '0.25rem 0.75rem',
-                borderRadius: '4px',
-              }}
-            >
-              Sign Up
-            </Link>
-          </nav>
-        )}
-      </header>
-      <main className="app-main">
+    <div className="app">
+      <NavBar />
+      <main className="main">
         <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+          <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<HomePage />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/:id" element={<Profile />} />
-            <Route path="/runs" element={<RunHistory />} />
-            <Route path="/runs/new" element={<RecordRun />} />
-            <Route path="/runs/:id" element={<RunDetail />} />
             <Route path="/leaderboards" element={<Leaderboards />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/runs" element={<RunHistory />} />
+            <Route path="/runs/:id" element={<RunDetail />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:id" element={<Profile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -159,40 +70,12 @@ const AppShell = () => {
   );
 };
 
-import { useToast } from './hooks/useToast';
-
-function GlobalApiListeners() {
-  const { logout } = useAuth();
-  const { addToast } = useToast();
-
-  React.useEffect(() => {
-    const handleError = (e: any) => {
-      addToast(e.detail?.message || 'An API error occurred', 'error');
-    };
-
-    const handleUnauthorized = () => {
-      logout();
-      addToast('Your session has expired. Please log in again.', 'error');
-    };
-
-    window.addEventListener('api-error', handleError);
-    window.addEventListener('api-unauthorized', handleUnauthorized);
-
-    return () => {
-      window.removeEventListener('api-error', handleError);
-      window.removeEventListener('api-unauthorized', handleUnauthorized);
-    };
-  }, [addToast, logout]);
-
-  return null;
-}
-
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <GlobalApiListeners />
-        <AppShell />
+        <AppRoutes />
       </ToastProvider>
     </AuthProvider>
   );

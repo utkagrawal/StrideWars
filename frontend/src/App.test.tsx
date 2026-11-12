@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, beforeEach, it, expect, Mock } from 'vitest';
 import App from './App';
 import * as useAuthHook from './hooks/useAuth';
@@ -14,66 +14,46 @@ vi.mock('./hooks/useAuth', async (importOriginal) => {
   };
 });
 
+// The map page talks to Leaflet and the API; the shell tests only care about navigation.
+vi.mock('./pages/MapPage', () => ({ MapPage: () => <div>map page</div> }));
 vi.mock('./api/notifications', () => ({
-  getUnreadCount: vi.fn().mockResolvedValue({ count: 0 }),
+  getUnreadCount: vi.fn().mockResolvedValue({ count: 3 }),
 }));
 
-Object.defineProperty(global, 'localStorage', {
-  value: {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-  },
-  writable: true,
-});
-
-const renderApp = () => {
-  return render(
-    <BrowserRouter>
+const renderApp = () =>
+  render(
+    <MemoryRouter initialEntries={['/']}>
       <App />
-    </BrowserRouter>
+    </MemoryRouter>
   );
-};
 
-describe('App Shell Navigation', () => {
+describe('App shell', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders limited navigation when logged out', () => {
-    (useAuthHook.useAuth as Mock).mockReturnValue({ user: null });
-
+  it('shows the landing page and auth links when logged out', () => {
+    (useAuthHook.useAuth as Mock).mockReturnValue({ user: null, logout: vi.fn() });
     renderApp();
 
-    expect(screen.getByText('StrideWars')).toBeInTheDocument();
-    expect(screen.getAllByText('Log In').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Sign Up').length).toBeGreaterThan(0);
-
-    // Auth-only links should not be present
-    expect(screen.queryByText('Feed')).not.toBeInTheDocument();
-    expect(screen.queryByText('Rankings')).not.toBeInTheDocument();
-    expect(screen.queryByText('Profile')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Run a loop/i);
+    expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Leaderboard' })).not.toBeInTheDocument();
   });
 
-  it('renders full navigation when logged in', () => {
+  it('shows the map and full navigation when logged in', async () => {
     (useAuthHook.useAuth as Mock).mockReturnValue({
       user: { id: '1', username: 'testuser' },
+      logout: vi.fn(),
     });
-
     renderApp();
 
-    expect(screen.getByText('StrideWars')).toBeInTheDocument();
-    expect(screen.getByText('Feed')).toBeInTheDocument();
-    expect(screen.getByText('Map')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Runs')).toBeInTheDocument();
-    expect(screen.getByText('+ Record')).toBeInTheDocument();
-    expect(screen.getByText('Rankings')).toBeInTheDocument();
-    expect(screen.getByText('Profile')).toBeInTheDocument();
-
-    // Logged out links should be gone
-    expect(screen.queryByText('Log In')).not.toBeInTheDocument();
-    expect(screen.queryByText('Sign Up')).not.toBeInTheDocument();
+    expect(screen.getByText('map page')).toBeInTheDocument();
+    for (const name of ['Map', 'Leaderboard', 'Feed', 'My Runs']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
+    expect(await screen.findByLabelText('3 unread alerts')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
   });
 });

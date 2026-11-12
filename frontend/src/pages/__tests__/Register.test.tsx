@@ -48,7 +48,7 @@ describe('Register Page', () => {
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'test' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@test.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Register' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => {
       expect(screen.getByText('Password too short')).toBeInTheDocument();

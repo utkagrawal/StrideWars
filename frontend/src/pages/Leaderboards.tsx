@@ -1,225 +1,170 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getGlobalLeaderboard,
-  getUserGlobalRank,
   getRegionalLeaderboard,
+  getUserGlobalRank,
   LeaderboardEntry,
 } from '../api/leaderboards';
+import { getMyTerritories } from '../api/territories';
 import { useAuth } from '../hooks/useAuth';
 import { formatArea } from '../utils/format';
+import { colorForRunner } from '../utils/colors';
+import { Avatar, EmptyState, PageLoading } from '../components/ui';
+
+type Tab = 'global' | 'regional';
 
 export const Leaderboards = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'global' | 'regional'>('global');
-  const [globalEntries, setGlobalEntries] = useState<LeaderboardEntry[]>([]);
-  const [regionalEntries, setRegionalEntries] = useState<LeaderboardEntry[]>([]);
-  const [userRank, setUserRank] = useState<{
-    rank: number | null;
-    areaSquareMeters: number;
-  } | null>(null);
+  const [tab, setTab] = useState<Tab>('global');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [me, setMe] = useState<{ rank: number | null; areaSquareMeters: number } | null>(null);
+  const [regionName, setRegionName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [regionName, setRegionName] = useState<string | null>(null);
-
-  // SF prefix for demo
-  const DEMO_PREFIX = '9q8';
 
   useEffect(() => {
-    fetchLeaderboards();
-  }, [activeTab]);
-
-  const fetchLeaderboards = async () => {
+    let cancelled = false;
     setLoading(true);
     setError('');
-    try {
-      if (activeTab === 'global') {
-        const [globalData, rankData] = await Promise.all([
-          getGlobalLeaderboard(50),
-          getUserGlobalRank(),
-        ]);
-        setGlobalEntries(globalData.entries);
-        setUserRank(rankData);
-      } else {
-        let lat: number | undefined;
-        let lng: number | undefined;
 
-        if (navigator.geolocation) {
-          try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-            });
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-          } catch (e) {
-            console.warn('Geolocation failed for leaderboard:', e);
-          }
-        }
-
-        const params: any = { limit: 50 };
-        if (lat !== undefined && lng !== undefined) {
-          params.lat = lat;
-          params.lng = lng;
-        } else {
-          params.geohashPrefix = DEMO_PREFIX;
-        }
-
-        const regionalData = await getRegionalLeaderboard(params);
-        setRegionalEntries(regionalData.entries);
-        setRegionName(
-          regionalData.regionName || (lat === undefined ? 'Unavailable' : 'Unknown Region')
-        );
+    const load = async () => {
+      if (tab === 'global') {
+        const [board, mine] = await Promise.all([getGlobalLeaderboard(50), getUserGlobalRank()]);
+        if (cancelled) return;
+        setEntries(board.entries);
+        setMe(mine);
+        return;
       }
-    } catch (err) {
-      setError('Failed to fetch leaderboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const renderTable = (entries: LeaderboardEntry[]) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
-      <thead>
-        <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <th style={{ textAlign: 'left', padding: '0.5rem' }}>Rank</th>
-          <th style={{ textAlign: 'left', padding: '0.5rem' }}>Player</th>
-          <th style={{ textAlign: 'right', padding: '0.5rem' }}>Area Claimed</th>
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((entry) => (
-          <tr
-            key={entry.userId}
-            style={{
-              borderBottom: '1px solid var(--color-bg-elevated)',
-              background: entry.userId === user?.id ? 'rgba(74, 222, 128, 0.1)' : 'transparent',
-              fontWeight: entry.userId === user?.id ? 'bold' : 'normal',
-            }}
-          >
-            <td style={{ padding: '0.75rem 0.5rem' }}>#{entry.rank}</td>
-            <td style={{ padding: '0.75rem 0.5rem' }}>
-              <a
-                href={`/profile/${entry.userId}`}
-                style={{ color: 'white', textDecoration: 'none' }}
-              >
-                {entry.username}
-              </a>
-              {entry.userId === user?.id && (
-                <span style={{ marginLeft: '0.5rem', color: 'var(--color-brand-primary)' }}>
-                  (You)
-                </span>
-              )}
-            </td>
-            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
-              {formatArea(entry.areaSquareMeters)}
-            </td>
-          </tr>
-        ))}
-        {entries.length === 0 && (
-          <tr>
-            <td
-              colSpan={3}
-              style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}
-            >
-              No ground claimed yet. Claim your first piece of the map today!
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  );
+      // "Your region" = the ~150 km geohash region around your most recent ground.
+      const mine = await getMyTerritories();
+      if (mine.length === 0) {
+        if (!cancelled) {
+          setEntries([]);
+          setRegionName(null);
+        }
+        return;
+      }
+      const latest = mine.reduce((a, b) => (a.captured_at > b.captured_at ? a : b));
+      const data = await getRegionalLeaderboard({
+        lat: Number(latest.center_lat),
+        lng: Number(latest.center_lng),
+        limit: 50,
+      });
+      if (cancelled) return;
+      setEntries(data.entries);
+      setRegionName(
+        data.regionName && data.regionName !== 'Unknown Region' ? data.regionName : null
+      );
+    };
 
-  let targetDelta = null;
-  if (userRank && userRank.rank && userRank.rank > 1) {
-    const target = globalEntries.find((e) => e.rank === userRank.rank! - 1);
-    if (target) {
-      targetDelta = {
-        rank: target.rank,
-        diff: target.areaSquareMeters - userRank.areaSquareMeters,
-      };
-    }
-  }
+    load()
+      .catch(() => !cancelled && setError('Could not load the leaderboard.'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
+
+  const top = entries[0]?.areaSquareMeters || 1;
+  const nextUp = me?.rank && me.rank > 1 ? entries.find((e) => e.rank === me.rank! - 1) : undefined;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <h2 style={{ marginBottom: '2rem' }}>Leaderboards</h2>
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Leaderboard</h1>
+          <p>Ranked by the ground you own right now. Lose cells and you drop.</p>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="tabs" role="tablist">
         <button
-          onClick={() => setActiveTab('global')}
-          style={{
-            background:
-              activeTab === 'global' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
-          }}
+          role="tab"
+          aria-selected={tab === 'global'}
+          className={tab === 'global' ? 'active' : ''}
+          onClick={() => setTab('global')}
         >
-          Global
+          Everyone
         </button>
         <button
-          onClick={() => setActiveTab('regional')}
-          style={{
-            background:
-              activeTab === 'regional' ? 'var(--color-brand-primary)' : 'var(--color-bg-surface)',
-          }}
+          role="tab"
+          aria-selected={tab === 'regional'}
+          className={tab === 'regional' ? 'active' : ''}
+          onClick={() => setTab('regional')}
         >
-          Regional {regionName ? `(${regionName})` : ''}
+          {regionName && tab === 'regional' ? regionName : 'Your region'}
         </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-
-      {activeTab === 'global' && userRank && (
-        <div
-          style={{
-            background: 'var(--color-bg-elevated)',
-            padding: '1rem',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '2rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-              Your Global Rank
-            </h3>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-              {userRank.rank ? `#${userRank.rank}` : 'Unranked'}
-            </div>
-            {targetDelta && (
-              <div
-                style={{
-                  fontSize: '0.85rem',
-                  color: 'var(--color-brand-primary)',
-                  marginTop: '0.25rem',
-                }}
-              >
-                Only {formatArea(targetDelta.diff)} to catch #{targetDelta.rank}!
-              </div>
-            )}
+      {tab === 'global' && me && (
+        <div className="stat-grid">
+          <div className="stat">
+            <div className="stat-label">Your rank</div>
+            <div className="stat-value">{me.rank ?? '–'}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-              Your Ground
-            </h3>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-              {formatArea(userRank.areaSquareMeters)}
-            </div>
+          <div className="stat">
+            <div className="stat-label">Your ground</div>
+            <div className="stat-value">{formatArea(me.areaSquareMeters)}</div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Next to beat</div>
+            <div className="stat-value">{nextUp ? nextUp.username : '–'}</div>
+            {nextUp ? (
+              <div className="stat-hint">
+                {formatArea(nextUp.areaSquareMeters - me.areaSquareMeters)} ahead of you
+              </div>
+            ) : (
+              me.rank === 1 && <div className="stat-hint">You&apos;re in front</div>
+            )}
           </div>
         </div>
       )}
 
+      {error && <div className="form-error">{error}</div>}
+
       {loading ? (
-        <p>Loading rankings...</p>
+        <PageLoading />
+      ) : entries.length === 0 ? (
+        <EmptyState title="No ground claimed here yet" actionTo="/" actionLabel="Run a loop">
+          Be the first to run a loop in this region.
+        </EmptyState>
       ) : (
-        <div
-          style={{
-            background: 'var(--color-bg-surface)',
-            padding: '1rem',
-            borderRadius: 'var(--radius-md)',
-          }}
-        >
-          {activeTab === 'global' ? renderTable(globalEntries) : renderTable(regionalEntries)}
-        </div>
+        <table className="lb">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Runner</th>
+              <th className="bar" aria-hidden="true" />
+              <th className="area">Ground</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => {
+              const isMe = e.userId === user?.id;
+              const color = colorForRunner(e.username, isMe);
+              return (
+                <tr key={e.userId} className={isMe ? 'me' : undefined}>
+                  <td className="rank">{e.rank}</td>
+                  <td>
+                    <div className="player">
+                      <Avatar name={e.username} color={color} size={30} isYou={isMe} />
+                      <Link to={isMe ? '/profile' : `/profile/${e.userId}`}>{e.username}</Link>
+                      {isMe && <span className="you-tag">you</span>}
+                    </div>
+                  </td>
+                  <td className="bar" aria-hidden="true">
+                    <span
+                      style={{ width: `${(e.areaSquareMeters / top) * 100}%`, background: color }}
+                    />
+                  </td>
+                  <td className="area">{formatArea(e.areaSquareMeters)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );

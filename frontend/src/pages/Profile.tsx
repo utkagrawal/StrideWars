@@ -1,242 +1,195 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../hooks/useToast';
 import { api } from '../api/axios';
-import { followUser, unfollowUser, getFollowers, getFollowing } from '../api/social';
+import { followUser, getFollowers, getFollowing, unfollowUser } from '../api/social';
+import { getGlobalLeaderboard, getUserGlobalRank } from '../api/leaderboards';
+import { colorForRunner } from '../utils/colors';
+import { formatArea } from '../utils/format';
+import { Avatar, Icon, PageLoading } from '../components/ui';
+
+interface ProfileUser {
+  id: string;
+  username: string;
+  email?: string;
+  displayName?: string | null;
+}
 
 export const Profile = () => {
   const { id } = useParams<{ id?: string }>();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
+  const { addToast } = useToast();
+  const navigate = useNavigate();
 
-  const isOwnProfile = !id || id === user?.id;
-  const targetUserId = id || user?.id;
+  const isOwn = !id || id === user?.id;
+  const targetId = (isOwn ? user?.id : id)!;
 
-  const [profileUser, setProfileUser] = useState<any>(null);
-  const [displayName, setDisplayName] = useState('');
-  const [message, setMessage] = useState('');
-
-  const [followersCount, setFollowersCount] = useState(0);
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
+  const [standing, setStanding] = useState<{ rank: number | null; area: number }>({
+    rank: null,
+    area: 0,
+  });
+  const [followers, setFollowers] = useState<{ id: string; username: string }[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (targetUserId) {
-      fetchProfileData();
-    }
-  }, [targetUserId]);
-
-  const fetchProfileData = async () => {
+    let cancelled = false;
     setLoading(true);
-    try {
-      // 1. Fetch user info
-      if (isOwnProfile) {
-        setProfileUser(user);
-        setDisplayName(user?.displayName || '');
-      } else {
-        const { data } = await api.get(`/users/${targetUserId}`);
-        setProfileUser(data.user);
-      }
 
-      // 2. Fetch social stats
-      const [followersData, followingData] = await Promise.all([
-        getFollowers(targetUserId!),
-        getFollowing(targetUserId!),
+    const load = async () => {
+      const profileReq: Promise<ProfileUser> = isOwn
+        ? Promise.resolve(user as ProfileUser)
+        : api.get(`/users/${targetId}`).then((r) => r.data.user);
+
+      // Your own rank is a direct Redis lookup; for others we find them on the board.
+      const standingReq = isOwn
+        ? getUserGlobalRank().then((r) => ({ rank: r.rank, area: r.areaSquareMeters }))
+        : getGlobalLeaderboard(100).then(({ entries }) => {
+            const e = entries.find((x) => x.userId === targetId);
+            return { rank: e?.rank ?? null, area: e?.areaSquareMeters ?? 0 };
+          });
+
+      const [p, s, fol, fing] = await Promise.all([
+        profileReq,
+        standingReq,
+        getFollowers(targetId),
+        getFollowing(targetId),
       ]);
+      if (cancelled) return;
+      setProfile(p);
+      setDisplayName(p.displayName || '');
+      setStanding(s);
+      setFollowers(fol.users);
+      setFollowingCount(fing.users.length);
+    };
 
-      setFollowersCount(followersData.users.length);
-      setFollowingCount(followingData.users.length);
+    load()
+      .catch(() => !cancelled && setProfile(null))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [targetId, isOwn, user]);
 
-      // Check if current user is following this profile
-      if (!isOwnProfile && user) {
-        const amIFollowing = followersData.users.some((f: any) => f.id === user.id);
-        setIsFollowing(amIFollowing);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const amFollowing = followers.some((f) => f.id === user?.id);
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage('');
+  const toggleFollow = async () => {
     try {
-      await api.patch('/users/me', { displayName });
-      setMessage('Profile updated successfully!');
-    } catch (err) {
-      setMessage('Failed to update profile.');
-    }
-  };
-
-  const handleFollowToggle = async () => {
-    if (!targetUserId) return;
-    try {
-      if (isFollowing) {
-        await unfollowUser(targetUserId);
-        setIsFollowing(false);
-        setFollowersCount((prev) => prev - 1);
+      if (amFollowing) {
+        await unfollowUser(targetId);
+        setFollowers((f) => f.filter((x) => x.id !== user?.id));
       } else {
-        await followUser(targetUserId);
-        setIsFollowing(true);
-        setFollowersCount((prev) => prev + 1);
+        await followUser(targetId);
+        setFollowers((f) => [...f, { id: user!.id, username: user!.username }]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      addToast('Could not update follow status', 'error');
     }
   };
 
-  if (loading) return <div>Loading profile...</div>;
-  if (!profileUser) return <div>User not found.</div>;
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { data } = await api.patch('/users/me', { displayName: displayName.trim() });
+      updateUser(data.user); // header, avatar and this page all read from the auth user
+      addToast('Display name saved', 'success');
+    } catch {
+      addToast('Could not update your profile', 'error');
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
+  if (loading) return <PageLoading />;
+  if (!profile) {
+    return (
+      <div className="page">
+        <div className="form-error">Runner not found.</div>
+      </div>
+    );
+  }
+
+  const color = colorForRunner(profile.username, isOwn);
 
   return (
-    <div
-      className="profile-container"
-      style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '2rem',
-        }}
-      >
-        <h2>{isOwnProfile ? 'Your Profile' : `${profileUser.username}'s Profile`}</h2>
-        {!isOwnProfile && (
-          <button
-            onClick={handleFollowToggle}
-            style={{
-              background: isFollowing ? 'transparent' : 'var(--color-brand-primary)',
-              border: isFollowing ? '1px solid var(--color-brand-primary)' : 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              color: 'white',
-            }}
-          >
-            {isFollowing ? 'Unfollow' : 'Follow'}
-          </button>
-        )}
-      </div>
-
-      <div
-        style={{
-          background: 'var(--color-bg-surface)',
-          padding: '1.5rem',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: '2rem',
-        }}
-      >
-        <p>
-          <strong>Username:</strong> {profileUser.username}
-        </p>
-        {isOwnProfile && (
-          <p>
-            <strong>Email:</strong> {profileUser.email}
-          </p>
-        )}
-        {profileUser.displayName && (
-          <p>
-            <strong>Display Name:</strong> {profileUser.displayName}
-          </p>
-        )}
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '2rem',
-            marginTop: '1.5rem',
-            paddingTop: '1.5rem',
-            borderTop: '1px solid var(--color-bg-elevated)',
-          }}
-        >
+    <div className="page">
+      <div className="page-header" style={{ alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Avatar name={profile.username} color={color} size={64} isYou={isOwn} />
           <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{followersCount}</div>
-            <div style={{ color: 'var(--color-text-secondary)' }}>Followers</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{followingCount}</div>
-            <div style={{ color: 'var(--color-text-secondary)' }}>Following</div>
+            <h1>{profile.displayName || profile.username}</h1>
+            <p style={{ marginTop: 0 }}>@{profile.username}</p>
           </div>
         </div>
-        {followersCount === 0 && (
-          <p
-            style={{ color: 'var(--color-text-secondary)', marginTop: '1rem', fontSize: '0.9rem' }}
+        {isOwn ? (
+          <button className="btn btn-ghost" onClick={handleLogout}>
+            <Icon name="logout" /> Log out
+          </button>
+        ) : (
+          <button
+            className={`btn ${amFollowing ? 'btn-secondary' : 'btn-primary'}`}
+            onClick={toggleFollow}
           >
-            No followers yet. Start capturing ground to get noticed!
-          </p>
+            {amFollowing ? 'Following' : 'Follow'}
+          </button>
         )}
       </div>
 
-      {isOwnProfile && (
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="stat-label">Rank</div>
+          <div className="stat-value">{standing.rank ?? '–'}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Ground owned</div>
+          <div className="stat-value">{formatArea(standing.area)}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Followers</div>
+          <div className="stat-value">{followers.length}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Following</div>
+          <div className="stat-value">{followingCount}</div>
+        </div>
+      </div>
+
+      {isOwn && (
         <>
-          <form
-            onSubmit={handleUpdate}
-            className="update-form"
-            style={{
-              background: 'var(--color-bg-surface)',
-              padding: '1.5rem',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '2rem',
-            }}
-          >
-            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Edit Profile</h3>
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Display Name</label>
+          <h2 className="section-title">Account</h2>
+          <form className="card" onSubmit={saveName}>
+            <div className="field">
+              <label htmlFor="displayName">Display name</label>
               <input
-                type="text"
+                id="displayName"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Set a public display name"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg-elevated)',
-                  color: 'white',
-                }}
+                placeholder={profile.username}
+                maxLength={50}
               />
             </div>
-            <button
-              type="submit"
+            <div
               style={{
-                padding: '0.75rem 1.5rem',
-                background: 'var(--color-brand-primary)',
-                border: 'none',
-                borderRadius: 'var(--radius-sm)',
-                color: 'white',
-                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
               }}
             >
-              Update Profile
-            </button>
-            {message && (
-              <p
-                className="status-message"
-                style={{ marginTop: '1rem', color: 'var(--color-brand-primary)' }}
-              >
-                {message}
-              </p>
-            )}
+              <span className="muted" style={{ fontSize: '0.88rem' }}>
+                {profile.email}
+              </span>
+              <button type="submit" className="btn btn-primary btn-sm">
+                Save
+              </button>
+            </div>
           </form>
-
-          <button
-            onClick={logout}
-            style={{
-              width: '100%',
-              padding: '1rem',
-              background: 'transparent',
-              border: '1px solid #ef4444',
-              color: '#ef4444',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            Logout
-          </button>
         </>
       )}
     </div>

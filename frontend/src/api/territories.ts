@@ -15,10 +15,7 @@ export const getTerritoriesInBbox = async (
   minLng: number,
   maxLat: number,
   maxLng: number
-): Promise<{
-  territories: Territory[];
-  runPolygons: Record<string, { lat: number; lng: number }[]>;
-}> => {
+): Promise<{ territories: Territory[]; truncated: boolean }> => {
   const bbox = `${minLat},${minLng},${maxLat},${maxLng}`;
   const { data } = await api.get(`/territories?bbox=${bbox}`);
   return data;

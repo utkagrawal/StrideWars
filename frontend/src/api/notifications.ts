@@ -1,10 +1,18 @@
 import { api } from './axios';
 
+export interface TerritoryLostPayload {
+  message: string;
+  cellsLost: number;
+  lostToUserId: string;
+  lostToUsername: string;
+  runId: string | null;
+}
+
 export interface NotificationItem {
   id: string;
   userId: string;
-  type: string;
-  payload: any;
+  type: 'territory_lost' | string;
+  payload: TerritoryLostPayload;
   readAt: string | null;
   createdAt: string;
 }

@@ -1,13 +1,13 @@
 import { api } from './axios';
 
 export interface FeedItem {
-  type: 'run' | 'capture';
-  itemId: string;
+  type: 'run';
+  itemId: string; // run id
   userId: string;
   username: string;
-  geohash: string | null;
-  distanceMeters: number | null;
-  durationSeconds: number | null;
+  distanceMeters: number;
+  durationSeconds: number;
+  cellsClaimed: number;
   timestamp: string;
 }
 

@@ -26,7 +26,7 @@ describe('Login Page', () => {
 
   it('renders login form', () => {
     renderLogin();
-    expect(screen.getByText('Login to StrideWars')).toBeInTheDocument();
+    expect(screen.getByText('Welcome back')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
   });
@@ -40,7 +40,7 @@ describe('Login Page', () => {
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrongpass' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     await waitFor(() => {
       expect(screen.getByText('Invalid credentials')).toBeInTheDocument();

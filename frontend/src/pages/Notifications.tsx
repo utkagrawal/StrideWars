@@ -1,133 +1,111 @@
 import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { getNotifications, markAsRead, NotificationItem } from '../api/notifications';
+import { colorForRunner } from '../utils/colors';
+import { timeAgo } from '../utils/format';
+import { Avatar, EmptyState, PageLoading } from '../components/ui';
 
 export const Notifications = () => {
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async (cursor?: string) => {
+  const load = async (cursor?: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
       const data = await getNotifications(cursor, 20);
-      if (cursor) {
-        setItems((prev) => [...prev, ...data.notifications]);
-      } else {
-        setItems(data.notifications);
-      }
+      setItems((prev) => (cursor ? [...prev, ...data.notifications] : data.notifications));
       setNextCursor(data.nextCursor);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Failed to load notifications');
+      setError(err.response?.data?.error?.message || 'Failed to load alerts');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      const { notification } = await markAsRead(id);
-      setItems((prev) => prev.map((item) => (item.id === id ? notification : item)));
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    load();
+  }, []);
+
+  const open = async (item: NotificationItem) => {
+    if (!item.readAt) {
+      try {
+        const { notification } = await markAsRead(item.id);
+        setItems((prev) => prev.map((n) => (n.id === item.id ? notification : n)));
+      } catch {
+        /* non-critical */
+      }
     }
+    navigate('/'); // back to the map to win it back
   };
 
-  const renderPayload = (type: string, payload: any) => {
-    if (type === 'territory_lost') {
-      return (
-        <div>
-          <strong style={{ color: '#ef4444' }}>Ground Lost!</strong>
-          <br />
-          {payload.message
-            .replace('Someone', 'A rival')
-            .replace('captured', 'took')
-            .replace('territories', 'cells')}{' '}
-          — get out there and reclaim them.
-        </div>
-      );
-    }
-    return <div>Unknown notification type</div>;
-  };
+  const unread = items.filter((n) => !n.readAt).length;
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <h2 style={{ marginBottom: '2rem' }}>Alerts</h2>
-      {error && <div className="error-message">{error}</div>}
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Alerts</h1>
+          <p>
+            {unread > 0
+              ? `${unread} new since you last looked.`
+              : 'Every time a rival takes your ground, you hear about it here.'}
+          </p>
+        </div>
+      </div>
 
-      {items.length === 0 && !loading && (
-        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '2rem' }}>
-          Your territory is secure. No alerts right now.
+      {error && <div className="form-error">{error}</div>}
+
+      {loading && items.length === 0 ? (
+        <PageLoading />
+      ) : items.length === 0 ? (
+        <EmptyState title="Your territory is secure">No one has taken your ground. Yet.</EmptyState>
+      ) : (
+        <div className="list">
+          {items.map((item) => {
+            const p = item.payload;
+            const who = p.lostToUsername ?? 'A rival';
+            return (
+              <button
+                key={item.id}
+                className={`list-item${item.readAt ? '' : ' unread'}`}
+                onClick={() => open(item)}
+              >
+                <Avatar name={who} color={colorForRunner(who)} />
+                <div className="list-item-body">
+                  <div className="list-item-title">
+                    <strong>{who}</strong> took {p.cellsLost ?? 1}{' '}
+                    {(p.cellsLost ?? 1) === 1 ? 'cell' : 'cells'} of your ground
+                  </div>
+                  <div className="list-item-meta">
+                    {timeAgo(item.createdAt)} · tap to win it back
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {items.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              background: item.readAt ? 'var(--color-bg-surface)' : 'rgba(74, 222, 128, 0.1)',
-              border: item.readAt
-                ? '1px solid transparent'
-                : '1px solid var(--color-brand-primary)',
-              padding: '1rem',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              {renderPayload(item.type, item.payload)}
-              <div
-                style={{
-                  color: 'var(--color-text-secondary)',
-                  fontSize: '0.85rem',
-                  marginTop: '0.5rem',
-                }}
-              >
-                {new Date(item.createdAt).toLocaleString()}
-              </div>
-            </div>
-            {!item.readAt && (
-              <button
-                onClick={() => handleMarkAsRead(item.id)}
-                style={{
-                  padding: '0.5rem',
-                  background: 'var(--color-brand-primary)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                Mark Read
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
 
       {nextCursor && (
         <button
-          onClick={() => fetchNotifications(nextCursor)}
+          className="btn btn-secondary btn-block"
+          style={{ marginTop: '1rem' }}
+          onClick={() => load(nextCursor)}
           disabled={loading}
-          style={{
-            width: '100%',
-            marginTop: '2rem',
-            background: 'transparent',
-            border: '1px solid var(--color-brand-primary)',
-            padding: '1rem',
-            color: 'white',
-          }}
         >
-          {loading ? 'Loading...' : 'Load More'}
+          {loading ? 'Loading…' : 'Load more'}
         </button>
       )}
+
+      <p className="muted" style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>
+        Alerts are created by a background worker after each capture commits.{' '}
+        <Link to="/feed" style={{ textDecoration: 'underline' }}>
+          See the feed
+        </Link>
+      </p>
     </div>
   );
 };

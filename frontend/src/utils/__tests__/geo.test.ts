@@ -4,7 +4,9 @@ import {
   calculateHaversineDistance,
   calculateTotalDistance,
   traceClusterPerimeter,
-  generateRandomLoop,
+  closeLoop,
+  densifyPath,
+  stampAtPace,
 } from '../geo';
 
 describe('Geo Utilities', () => {
@@ -92,21 +94,45 @@ describe('Geo Utilities', () => {
     });
   });
 
-  describe('generateRandomLoop', () => {
-    it('generates a closed loop of the correct length with timestamps', () => {
-      const numPoints = 8;
-      const loop = generateRandomLoop(0, 0, numPoints, 100);
+  describe('drawn-route helpers', () => {
+    const square = [
+      { lat: 26.0, lng: 91.0 },
+      { lat: 26.003, lng: 91.0 },
+      { lat: 26.003, lng: 91.003 },
+      { lat: 26.0, lng: 91.003 },
+    ];
 
-      expect(loop.length).toBe(numPoints + 1); // +1 for closing point
+    it('closeLoop appends the start point once', () => {
+      const closed = closeLoop(square);
+      expect(closed).toHaveLength(5);
+      expect(closed[4]).toEqual(closed[0]);
+      expect(closeLoop(closed)).toHaveLength(5);
+    });
 
-      // Check closure
-      expect(loop[0].lat).toBe(loop[loop.length - 1].lat);
-      expect(loop[0].lng).toBe(loop[loop.length - 1].lng);
+    it('densifyPath keeps samples within the step distance', () => {
+      const dense = densifyPath(closeLoop(square), 20);
+      for (let i = 1; i < dense.length; i++) {
+        const d = calculateHaversineDistance(
+          dense[i - 1].lat,
+          dense[i - 1].lng,
+          dense[i].lat,
+          dense[i].lng
+        );
+        expect(d).toBeLessThanOrEqual(20.5);
+      }
+    });
 
-      // Check timestamps are valid ISO strings
-      loop.forEach((pt) => {
-        expect(new Date(pt.recordedAt).getTime()).not.toBeNaN();
-      });
+    it('stampAtPace produces a believable running pace ending now', () => {
+      const run = stampAtPace(densifyPath(closeLoop(square)), 330);
+      const meters = calculateTotalDistance(run);
+      const secs =
+        (new Date(run[run.length - 1].recordedAt).getTime() -
+          new Date(run[0].recordedAt).getTime()) /
+        1000;
+      const pace = secs / (meters / 1000);
+      expect(pace).toBeGreaterThan(300);
+      expect(pace).toBeLessThan(400);
+      expect(Date.now() - new Date(run[run.length - 1].recordedAt).getTime()).toBeLessThan(5000);
     });
   });
 });

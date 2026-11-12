@@ -167,34 +167,62 @@ export function traceClusterPerimeter(hashes: string[]): [number, number][][] {
   return rings;
 }
 
+/** Typical easy-run pace (5:30 min/km) used when turning a drawn route into a "run". */
+export const DEMO_PACE_SEC_PER_KM = 330;
+
+/** Returns the path with its first point appended, if it isn't already closed. */
+export function closeLoop<T extends Point>(points: T[]): T[] {
+  if (points.length < 2) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (calculateHaversineDistance(first.lat, first.lng, last.lat, last.lng) < 1) return points;
+  return [...points, { ...first }];
+}
+
 /**
- * Generates a random closed loop of points around a center for demo purposes.
+ * Inserts intermediate points so no two consecutive samples are more than
+ * `stepMeters` apart, so a hand-drawn route looks like a GPS recording.
  */
-export function generateRandomLoop(
-  centerLat: number,
-  centerLng: number,
-  numPoints = 12,
-  baseRadius = 150
-): (Point & { recordedAt: string })[] {
-  const points: (Point & { recordedAt: string })[] = [];
-  const now = new Date();
-
-  for (let i = 0; i < numPoints; i++) {
-    // Generate roughly a circle, but jitter the bearing and radius
-    const angle = (360 / numPoints) * i;
-    const jitteredAngle = angle + (Math.random() * 20 - 10);
-    const jitteredRadius = baseRadius + (Math.random() * 100 - 50);
-
-    const pt = destinationPoint(centerLat, centerLng, jitteredAngle, jitteredRadius);
-    points.push({ ...pt, recordedAt: new Date(now.getTime() + i * 1000).toISOString() });
+export function densifyPath(points: Point[], stepMeters = 20): Point[] {
+  if (points.length < 2) return points;
+  const out: Point[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const d = calculateHaversineDistance(a.lat, a.lng, b.lat, b.lng);
+    const steps = Math.max(1, Math.ceil(d / stepMeters));
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      out.push({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t });
+    }
   }
+  out.push(points[points.length - 1]);
+  return out;
+}
 
-  // Explicitly close the loop with the exact same coordinates as the first point
-  points.push({
-    lat: points[0].lat,
-    lng: points[0].lng,
-    recordedAt: new Date(now.getTime() + numPoints * 1000).toISOString(),
-  });
-
-  return points;
+/**
+ * Timestamps a path as if it had just been run at a steady pace (finishing now),
+ * so it passes the server's anti-spoofing pace check.
+ */
+export function stampAtPace(
+  points: Point[],
+  secPerKm = DEMO_PACE_SEC_PER_KM,
+  endTime = new Date()
+): (Point & { recordedAt: string })[] {
+  const offsets: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const d = calculateHaversineDistance(
+      points[i - 1].lat,
+      points[i - 1].lng,
+      points[i].lat,
+      points[i].lng
+    );
+    offsets.push(offsets[i - 1] + Math.max(1, Math.round((d / 1000) * secPerKm)));
+  }
+  const startMs = endTime.getTime() - offsets[offsets.length - 1] * 1000;
+  return points.map((p, i) => ({
+    lat: p.lat,
+    lng: p.lng,
+    recordedAt: new Date(startMs + offsets[i] * 1000).toISOString(),
+  }));
 }
